@@ -1,15 +1,14 @@
 import mongoose from "mongoose";
 
-const dummySchema = new mongoose.Schema({
+const skillSchema = new mongoose.Schema({
    name :{
     type:String,
-    required: true
-   },age:{
-    type:Number,
-    required: true
-   },email:{
+    required: true,
+    unique:true,
+   },
+   description:{
     type:String,
     required: true
-   }
+   },
 })
-export const dummy = mongoose.model("dummy", dummySchema);
+export const Skill = mongoose.model("Skill", skillSchema);

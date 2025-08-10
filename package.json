@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon src/index.js"
+    "start": "nodemon src/index.js",
+    "seed": "node src/seeders/skillSeeders.js"
   },
   "type": "module",
   "keywords": [],

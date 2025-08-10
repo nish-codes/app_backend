@@ -90,7 +90,12 @@ education:{
         type: Number,
         required: true
     }
-}
+},
+ user_skills: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}, // Initialize as an empty object
+        description: "A summary of the user's highest-level skills and their associated badges."
+    },
     
 })
 

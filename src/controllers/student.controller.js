@@ -1,6 +1,6 @@
 
 
-import { dummy} from "../models/dummy.model.js";
+// import { dummy} from "../models/dummy.model.js";
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
 
@@ -45,3 +45,5 @@ catch(error) {
         return res.status(500).json({ message: "Internal server error" });
     }
 }
+
+
