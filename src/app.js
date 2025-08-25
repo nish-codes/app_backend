@@ -12,4 +12,5 @@ app.use(express.static("public"))
 
 import studentRoute from "./routes/student.route.js"
 app.use("/student",studentRoute)
+app.use("/recruiter",recruiterRoute)
 export default app 

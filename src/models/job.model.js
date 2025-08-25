@@ -13,13 +13,19 @@ const jobSchema = new mongoose.Schema({
         required: true,
         ref: 'Recruiter',
     },
+    salaryRange:{
+        min: { type: Number, required: true },
+        max: { type: Number, required: true },
+    },
     preferences:{
-         skills: [{ type: String }],   // ["React", "Node.js", "MongoDB"]
-      minExperience: { type: Number }, // years of experience required
-      education: { type: String },  // e.g. "B.Tech CSE"
+         skills: [{ type: String }],  
+      minExperience: { type: Number }, 
+      education: { type: String },  
       location: { type: String }, 
     }
 
+},{
+    timestamps: true
 });
-
+jobSchema.index({ title: "text","preferences.skills":1,"preferences.location":1 })
 export const Job = mongoose.model("Job", jobSchema);

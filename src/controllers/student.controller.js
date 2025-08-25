@@ -45,5 +45,17 @@ catch(error) {
         return res.status(500).json({ message: "Internal server error" });
     }
 }
+const getHackathons = async (req, res) => {
+    try{
+        const hackathons = await Hackathon.find().sort({startDate: 1});
+        return res.status(200).json({hackathons});
+    }
+    catch(error){
 
+    }
+}
+const getJobs = async(req,res)=>{
+
+}
+export {signup, login};
 
