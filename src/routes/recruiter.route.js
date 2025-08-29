@@ -1,7 +1,16 @@
 import { Router } from "express";
-import { recruiterLogin, recruiterSignup } from "../controllers/recruiter.controller.js";
+import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
+import { recruiterSignup, recruiterLogin, postJob } from "../controllers/recruiter.controller.js";
 
-const route = Router()
-route.route("/signup").post(verifyFirebaseToken, recruiterSignup);
-route.route("/login").post(verifyFirebaseToken, recruiterLogin);
+const router = Router();
 
+// Recruiter signup
+router.post("/signup", verifyFirebaseToken, recruiterSignup);
+
+// Recruiter login
+router.post("/login", verifyFirebaseToken, recruiterLogin);
+
+// Recruiter post job
+router.post("/post-job", verifyFirebaseToken, postJob);
+
+export default router;
