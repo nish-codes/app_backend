@@ -5,31 +5,42 @@ import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
 import { Job } from "../models/job.model.js";
 
-const signup = async (req, res) => {
-    const {uid,email} = req.user
-    const {firstName, lastName} = req.body
-    try{
-        const user = await Student.findOne({firebaseid: uid});
-        if(user) {
-            return res.status(400).json({message: "User already exists"});
-        }
-        const newUser = await Student.create({
-            firebaseid: uid,
-            email,
+ const signup = async (req, res) => {
+    const { uid, email, name, picture } = req.user; // decoded from Firebase token
+  
+    try {
+      // 1️⃣ Check if user exists
+      let user = await Student.findOne({ firebaseId: uid });
+      if (user) {
+        return res.status(200).json({
+          message: "User already exists",
+          user,
+        }); 
+      }
+  
+      // 2️⃣ Create new user with minimal info (Google signup)
+      user = await Student.create({
+        firebaseId: uid,
+        email,
         profile: {
-            firstName,
-            lastName
-        }})
-
-        return res.status(201).json({message: "User created successfully", user: newUser});
-    
-
+          firstName: name?.split(" ")[0] || "",
+          lastName: name?.split(" ")[1] || "",
+          profilePicture: picture || "",
+        },
+      });
+  
+      return res.status(201).json({
+        message: "User created successfully",
+        user,
+      });
+    } catch (error) {
+      console.error("Error during signup:", error);
+      return res.status(500).json({
+        message: "Internal server error",
+        error: error.message,
+      });
     }
-    catch(error) {
-        console.error("Error during signup:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-}
+  };
 
 const login = async (req, res) => {
     const {uid, email} = req.user

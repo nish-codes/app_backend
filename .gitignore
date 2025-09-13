@@ -1,7 +1,6 @@
-# Created by https://www.toptal.com/developers/gitignore/api/node
-# Edit at https://www.toptal.com/developers/gitignore?templates=node
-#serviceAccount
-src/config/serviceAccountKey.json
+# Ignore Firebase service account key
+/serviceAccountKey.json
+
 ### Node ###
 # Logs
 logs
@@ -141,5 +140,3 @@ dist
 
 # SvelteKit build / generate output
 .svelte-kit
-
-# End of https://www.toptal.com/developers/gitignore/api/node
