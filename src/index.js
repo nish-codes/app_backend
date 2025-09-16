@@ -1,13 +1,19 @@
-
-import app from "./app.js";
-import { connectDb } from "./db/index.js";
+import express from "express";
 import dotenv from "dotenv";
-dotenv.config({
-    path: "./.env"
-});
-connectDb().then(()=>{
-    app.listen(3000,()=>{
-        console.log("Server is running on port 3000");
-    })
-}
-)
+import studentRoutes from "./routes/student.route.js";
+import jobRoutes from "./routes/jobRoutes.js";   // ✅ here
+import connectDb from "./db/index.js";
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+
+// Connect MongoDB
+connectDb().then(() => console.log("Database connected"));
+
+// Routes
+app.use("/student", studentRoutes);
+app.use("/jobs", jobRoutes);   // ✅ now jobs are available
+
+app.listen(3000, () => console.log("Server running on port 3000"));
