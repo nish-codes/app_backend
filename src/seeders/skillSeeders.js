@@ -1,11 +1,12 @@
 import mongoose from "mongoose";
-import { Skill } from '../models/dummy.model.js'; 
-import { connectDb } from "../db/index.js"; 
+import { Skill } from '../models/dummy.model.js';
+import { connectDb } from "../db/index.js";
 import dotenv from 'dotenv';
 
 // Load environment variables immediately
 dotenv.config();
 
+//seeders are scripts used to populate a db with initial and default data
 const defaultSkills = [
   { name: "Python", description: "A general-purpose programming language." },
   { name: "Marketing", description: "Promoting products or services." },

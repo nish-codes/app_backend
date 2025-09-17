@@ -3,17 +3,17 @@
 // import { dummy} from "../models/dummy.model.js";
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
-<<<<<<< HEAD
+// <<<<<<< HEAD
 import Job from "../models/job.model.js";
 
-=======
+// =======
 import { Job } from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
->>>>>>> origin/main
+// >>>>>>> origin/main
 
 const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user; // decoded from Firebase token
-  
+
   try {
     // 1️⃣ Check if user exists
     let user = await Student.findOne({ firebaseId: uid });
@@ -21,7 +21,7 @@ const signup = async (req, res) => {
       return res.status(200).json({
         message: "User already exists",
         user,
-      }); 
+      });
     }
 
     // 2️⃣ Extract additional data from request body
@@ -78,103 +78,103 @@ const signup = async (req, res) => {
 };
 
 const login = async (req, res) => {
-    const {uid, email} = req.user
-    try {
-       const user = await Student.findOne({ firebaseid: uid });
-        if(!user) {
-            return res.status(404).json({message: "User not found"});
-        }
-        return res.status(200).json({message: "Login successful", user});
-
-}
-catch(error) {
-        console.error("Error during login:", error);
-        return res.status(500).json({ message: "Internal server error" });
+  const { uid, email } = req.user
+  try {
+    const user = await Student.findOne({ firebaseid: uid });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+    return res.status(200).json({ message: "Login successful", user });
+
+  }
+  catch (error) {
+    console.error("Error during login:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 const getHackathons = async (req, res) => {
-    try{
-        const hackathons = await Hackathon.find().sort({startDate: 1});
-        return res.status(200).json({hackathons});
-    }
-    catch(error){
+  try {
+    const hackathons = await Hackathon.find().sort({ startDate: 1 });
+    return res.status(200).json({ hackathons });
+  }
+  catch (error) {
 
-    }
+  }
 }
-const getJobs = async(req,res)=>{
-    try {
-        const { q, location, skills, page = "1", limit = "20", sort = "-createdAt" } = req.query;
+const getJobs = async (req, res) => {
+  try {
+    const { q, location, skills, page = "1", limit = "20", sort = "-createdAt" } = req.query;
 
-        const filter = {};
-        if (q && typeof q === "string" && q.trim().length) {
-            filter.$text = { $search: q.trim() };
-        }
-        if (location && typeof location === "string" && location.trim().length) {
-            filter["preferences.location"] = location.trim();
-        }
-        if (skills && typeof skills === "string" && skills.trim().length) {
-            const skillArray = skills
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
-            if (skillArray.length) {
-                filter["preferences.skills"] = { $in: skillArray };
-            }
-        }
-
-        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
-        const skip = (pageNum - 1) * limitNum;
-
-        const [jobs, total] = await Promise.all([
-            Job.find(filter)
-                .sort(sort)
-                .skip(skip)
-                .limit(limitNum)
-                .populate({
-                    path: "recruiter",
-                    select: "name email designation companyId",
-                    populate: {
-                        path: "companyId",
-                        model: "Company",
-                        select: "name industry location logo",
-                    },
-                }),
-            Job.countDocuments(filter),
-        ]);
-
-        return res.status(200).json({
-            data: jobs,
-            pagination: {
-                page: pageNum,
-                limit: limitNum,
-                total,
-                pages: Math.ceil(total / limitNum),
-            },
-        });
-    } catch (error) {
-        console.error("Error fetching jobs:", error);
-        return res.status(500).json({ message: "Internal server error" });
+    const filter = {};
+    if (q && typeof q === "string" && q.trim().length) {
+      filter.$text = { $search: q.trim() };
     }
+    if (location && typeof location === "string" && location.trim().length) {
+      filter["preferences.location"] = location.trim();
+    }
+    if (skills && typeof skills === "string" && skills.trim().length) {
+      const skillArray = skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (skillArray.length) {
+        filter["preferences.skills"] = { $in: skillArray };
+      }
+    }
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [jobs, total] = await Promise.all([
+      Job.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum)
+        .populate({
+          path: "recruiter",
+          select: "name email designation companyId",
+          populate: {
+            path: "companyId",
+            model: "Company",
+            select: "name industry location logo",
+          },
+        }),
+      Job.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      data: jobs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching jobs:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 const applyToJob = async (req, res) => {
-    try {
+  try {
     const { jobId } = req.params;
-    const studentId = req.user._id; 
+    const studentId = req.user._id;
 
-    
+
     const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    
+
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    
+
     const existingApp = await Application.findOne({
       job: jobId,
       candidate: studentId,
@@ -271,5 +271,5 @@ const updateStudentProfile = async (req, res) => {
     });
   }
 };
-export {signup, login, getJobs};
+export { signup, login, getJobs };
 
