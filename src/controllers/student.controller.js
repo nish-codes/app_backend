@@ -1,15 +1,14 @@
-
-
 // import { dummy} from "../models/dummy.model.js";
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
 // <<<<<<< HEAD
 // import Job from "../models/job.model.js";
 
-// =======
+import Job from "../models/job.model.js";
 // import { Job } from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
-// >>>>>>> origin/main
+
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 
 export const checkUser = async (req, res) => {
@@ -35,7 +34,7 @@ import { Student } from "../models/student.model.js";
  * - Firebase info (uid, email, name, picture) comes from the verified token
  * - Extra info (FullName, profilePicture, bio, education, skills, etc.) comes from the frontend form
  */
-export const signup = async (req, res) => {
+const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user; // decoded from Firebase token
 
   try {
@@ -287,5 +286,87 @@ const updateStudentProfile = async (req, res) => {
     });
   }
 };
-export { signup, login, getJobs };
+
+const uploadProfilePhoto = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+
+    // Check if file is uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a profile photo to upload',
+        expectedField: 'profilePhoto'
+      });
+    }
+
+    console.log(`Uploading profile photo for student: ${studentId}`);
+
+    // Upload to Cloudinary with profile photo settings
+    const cloudinaryResult = await uploadOnCloudinary(req.file.path, {
+      folder: 'profile_photos',
+      transformation: [
+        { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+        { quality: 'auto:good' },
+        { fetch_format: 'auto' }
+      ],
+      tags: ['profile_photo', 'student']
+    });
+
+    if (!cloudinaryResult || !cloudinaryResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to upload your profile photo. Please try again.',
+        error: cloudinaryResult?.error || 'Upload service error'
+      });
+    }
+
+    // Update student profile with new photo
+    const updatedStudent = await Student.findByIdAndUpdate(
+      studentId,
+      {
+        $set: {
+          "profile.profilePicture": cloudinaryResult.url,
+          "profile.profilePicturePublicId": cloudinaryResult.public_id,
+          "updatedAt": new Date()
+        }
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedStudent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student profile not found'
+      });
+    }
+
+    console.log(`Profile photo updated successfully for student: ${studentId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile photo updated successfully!',
+      data: {
+        profilePicture: cloudinaryResult.url,
+        student: {
+          id: updatedStudent._id,
+          name: `${updatedStudent.profile?.firstName || ''} ${updatedStudent.profile?.lastName || ''}`.trim(),
+          email: updatedStudent.email,
+          profilePicture: updatedStudent.profile?.profilePicture
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Error uploading profile photo:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Something went wrong while uploading your photo. Please try again.',
+      error: error.message
+    });
+  }
+};
+
+export { signup, login, getJobs, uploadProfilePhoto };
 
