@@ -27,8 +27,6 @@ export const checkUser = async (req, res) => {
   }
 };
   
-import { Student } from "../models/student.model.js";
-
 /**
  * Signup a first-time user
  * - Firebase info (uid, email, name, picture) comes from the verified token
