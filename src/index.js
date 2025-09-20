@@ -16,4 +16,6 @@ connectDb().then(() => console.log("Database connected"));
 app.use("/student", studentRoutes);
 app.use("/jobs", jobRoutes);   // ✅ now jobs are available
 
+
+
 app.listen(3000, () => console.log("Server running on port 3000"));

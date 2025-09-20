@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
-import { signup } from "../controllers/student.controller.js";
+import { signup , checkUser } from "../controllers/student.controller.js";
 
 const route = Router();
-
-route.post("/signup", verifyFirebaseToken, signup);
+route.post("/checkUser", verifyFirebaseToken, checkUser);
+route.post("/signup",verifyFirebaseToken, signup);
 
 export default route;
