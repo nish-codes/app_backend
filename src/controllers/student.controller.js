@@ -26,7 +26,6 @@ export const checkUser = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-  
 /**
  * Signup a first-time user
  * - Firebase info (uid, email, name, picture) comes from the verified token

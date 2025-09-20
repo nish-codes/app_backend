@@ -3,6 +3,7 @@ import serviceAccount from "../../serviceAccountKey.json" with { type: "json" };
 import fs from "fs";
 import path from "path";
 
+
 // Initialize Firebase Admin (only if service account key exists)
 let firebaseInitialized = false;
 
