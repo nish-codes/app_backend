@@ -226,5 +226,6 @@ const updateStudentProfile = async (req, res) => {
     });
   }
 };
+
 export {signup, login, getJobs};
 
