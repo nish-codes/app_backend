@@ -26,8 +26,8 @@ export const checkUser = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-  
-import { Student } from "../models/student.model.js";
+
+// import { Student } from "../models/student.model.js";
 
 /**
  * Signup a first-time user

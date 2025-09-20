@@ -1,10 +1,10 @@
 import admin from "firebase-admin";
-<<<<<<< HEAD
+
 import serviceAccount from "../../serviceAccountKey.json" with { type: "json" };
-=======
+
 import fs from "fs";
 import path from "path";
->>>>>>> 88c31f92286360be828f80da9d8ddc3e2360fa23
+
 
 // Initialize Firebase Admin (only if service account key exists)
 let firebaseInitialized = false;
