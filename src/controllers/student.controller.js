@@ -9,7 +9,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 /**
  * Check if a user exists by firebase UID
  */
-export const checkUser = async (req, res) => {
+ const checkUser = async (req, res) => {
   try {
     const uid = req.user?.uid;
     if (!uid) return res.status(400).json({ message: "Missing user UID" });
@@ -32,7 +32,7 @@ export const checkUser = async (req, res) => {
  * - Firebase info (uid, email, name, picture) comes from the verified token
  * - Extra info comes from frontend form
  */
-const signup = async (req, res) => {
+ const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user || {};
   try {
     if (!uid || !email) {
