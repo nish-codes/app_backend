@@ -349,4 +349,5 @@ const uploadProfilePhoto = async (req, res) => {
     return res.status(500).json({ success: false, message: "Something went wrong while uploading your photo", error: error.message });
   }
 };
+const ApplicationStatus=async(req,res)=>{}
 export {signup, login, getJobs, getHackathons, applyToJob, updateStudentProfile, getStudentAnalytics};
