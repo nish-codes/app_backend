@@ -16,7 +16,7 @@ const jobSchema = new mongoose.Schema(
     },
     jobType: {
       type: String,
-      enum: ["company", "on-campus"],
+      enum: ["company", "on-campus","external"],
       default: "company",
     },
     salaryRange: {

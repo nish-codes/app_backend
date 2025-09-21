@@ -42,7 +42,7 @@ const companySchema = new mongoose.Schema({
     },
 
     founded: {
-      type: Number,
+      type: Number,//year of establishmen
     },
 
     // Each company has recruiters (HR, hiring managers, etc.)
