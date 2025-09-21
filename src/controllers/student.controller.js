@@ -9,7 +9,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 /**
  * Check if a user exists by firebase UID
  */
-export const checkUser = async (req, res) => {
+const checkUser = async (req, res) => {
   try {
     const uid = req.user?.uid;
     if (!uid) return res.status(400).json({ message: "Missing user UID" });
@@ -73,38 +73,92 @@ const signup = async (req, res) => {
     }
 
     // Build user data (merge both variants safely)
+    // const userData = {
+    //   firebaseId: uid,
+    //   email,
+    //   phone: phone || "",
+    //   studentId: req.body?.studentId || undefined,
+    //   profile: {
+    //     firstName: profile?.firstName || profile?.FullName || (name ? name.split(" ")[0] : "") || "",
+    //     lastName:
+    //       profile?.lastName ||
+    //       (name && name.split(" ").length > 1 ? name.split(" ").slice(1).join(" ") : "") ||
+    //       "",
+    //     profilePicture: profile?.profilePicture || picture || "",
+    //     bio: profile?.bio || "",
+    //     dateOfBirth: profile?.dateOfBirth || undefined,
+    //     gender: profile?.gender || undefined,
+    //     location: profile?.location || undefined,
+    //   },
+    //   education: {
+    //     college: education?.college || "",
+    //     universityType: education?.universityType || "",
+    //     degree: education?.degree || "",
+    //     collegeEmail: education?.collegeEmail || "",
+    //     branch: education?.branch || "",
+    //     year: education?.year || undefined,
+    //     cgpa: education?.cgpa || undefined,
+    //     graduationYear: education?.graduationYear || undefined,
+    //   },
+    //   job_preference: Array.isArray(job_preference) ? job_preference : [],
+    //   experience: Array.isArray(experience) ? experience : [],
+    //   projects: Array.isArray(projects) ? projects : [],
+    //   user_skills: user_skills || {},
+    // };
+    
+    //changed userData according to the student model
     const userData = {
-      firebaseId: uid,
-      email,
-      phone: phone || "",
-      studentId: req.body?.studentId || undefined,
-      profile: {
-        firstName: profile?.firstName || profile?.FullName || (name ? name.split(" ")[0] : "") || "",
-        lastName:
-          profile?.lastName ||
-          (name && name.split(" ").length > 1 ? name.split(" ").slice(1).join(" ") : "") ||
-          "",
-        profilePicture: profile?.profilePicture || picture || "",
-        bio: profile?.bio || "",
-        dateOfBirth: profile?.dateOfBirth || undefined,
-        gender: profile?.gender || undefined,
-        location: profile?.location || undefined,
-      },
-      education: {
-        college: education?.college || "",
-        universityType: education?.universityType || "",
-        degree: education?.degree || "",
-        collegeEmail: education?.collegeEmail || "",
-        branch: education?.branch || "",
-        year: education?.year || undefined,
-        cgpa: education?.cgpa || undefined,
-        graduationYear: education?.graduationYear || undefined,
-      },
-      job_preference: Array.isArray(job_preference) ? job_preference : [],
-      experience: Array.isArray(experience) ? experience : [],
-      projects: Array.isArray(projects) ? projects : [],
-      user_skills: user_skills || {},
-    };
+  studentId: req.body?.studentId,  // required
+  firebaseId: uid,
+  email,
+  phone: phone || "",
+
+  profile: {
+    FullName:
+      profile?.FullName ||
+      (profile?.firstName || name ? name.split(" ")[0] : "") +
+        " " +
+        (profile?.lastName ||
+          (name && name.split(" ").length > 1
+            ? name.split(" ").slice(1).join(" ")
+            : "")),
+    profilePicture: profile?.profilePicture || picture || "",
+    bio: profile?.bio || "",
+  },
+
+  education: {
+    college: education?.college || "",
+    universityType: education?.universityType || undefined, // must be "deemed" | "public" | "private"
+    degree: education?.degree || "",
+    collegeEmail: education?.collegeEmail || "",
+  },
+
+  user_skills: user_skills
+    ? Object.entries(user_skills).reduce((acc, [skill, level]) => {
+        acc[skill] = { level }; // ensure format { skill: { level: "beginner" | "mid" | "adv" } }
+        return acc;
+      }, {})
+    : {},
+
+  job_preference: Array.isArray(job_preference) ? job_preference : [],
+
+  experience: Array.isArray(experience)
+    ? experience.map((exp) => ({
+        nameOfOrg: exp.nameOfOrg || exp.NameOfOrganization || "",
+        position: exp.position || "",
+        timeline: exp.timeline || "",
+        description: exp.description || "",
+      }))
+    : [],
+
+  projects: Array.isArray(projects)
+    ? projects.map((proj) => ({
+        projectName: proj.projectName || "",
+        link: proj.link || "",
+        description: proj.description || "",
+      }))
+    : [],
+};
 
     // Create user
     user = await Student.create(userData);
@@ -134,6 +188,25 @@ const login = async (req, res) => {
     console.error("Error during login:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
+};
+/**
+ * StudentDetails — sends student details for showing it in the profile or in edit features
+ */
+const getStudentDetails = async (req, res) => {
+    const uid = req.user?.uid;
+
+    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+    try {
+        const user = await Student.findOne({ firebaseId: uid });
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        return res.status(200).json({ message: "User fetched successfully", user });
+    } catch (error) {
+        console.error("Error fetching student details:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
 };
 
 /**
@@ -372,4 +445,82 @@ const uploadProfilePhoto = async (req, res) => {
   }
 };
 
-export { signup, login, getJobs, checkUser, getHackathons, applyToJob, updateStudentProfile, uploadProfilePhoto };
+// to add new skill to student's profile
+const addSkill = async (req, res) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  const { skillName } = req.body;
+  if (!skillName) return res.status(400).json({ message: "Skill name is required" });
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // If the skill already exists, do nothing or return a message
+    if (user.user_skills.has(skillName)) {
+      return res.status(400).json({ message: "Skill already exists" });
+    }
+
+    // Add new skill with null level
+    user.user_skills.set(skillName, { level: null });
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Skill added successfully",
+      skills: user.user_skills,
+    });
+  } catch (error) {
+    console.error("Error adding skill:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const verifySkill = async (req, res) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  const { skillName, level } = req.body;
+  if (!skillName || !level) return res.status(400).json({ message: "Skill name and level are required" });
+
+  const allowedLevels = ["beginner", "mid", "adv"];
+  if (!allowedLevels.includes(level)) {
+    return res.status(400).json({ message: "Invalid skill level" });
+  }
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Ensure the skill exists before verifying
+    if (!user.user_skills.has(skillName)) {
+      return res.status(400).json({ message: "Skill does not exist. Add it first." });
+    }
+
+    user.user_skills.set(skillName, { level });
+    await user.save();
+
+    return res.status(200).json({
+      message: "Skill level updated successfully",
+      skills: user.user_skills,
+    });
+  } catch (error) {
+    console.error("Error updating skill level:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export {
+  signup,
+  login,
+  getJobs,
+  checkUser,
+  getHackathons,
+  applyToJob,
+  updateStudentProfile,
+  uploadProfilePhoto,
+  getStudentDetails,
+  addSkill,
+  verifySkill,
+};
