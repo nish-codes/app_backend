@@ -2,12 +2,9 @@
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
 
-import Job from "../models/job.model.js";
-
-
-import { Job } from "../models/job.model.js";
+import Job  from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
-
+import {calculateSkillScore} from './applications.controller.js'
 
 const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user; // decoded from Firebase token
@@ -262,7 +259,6 @@ const getJobs = async (req, res) => {
 const applyToJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    // Prefer using user._id if auth middleware sets it; fall back to firebaseId lookup if not
     const studentId = req.user?._id || null;
     let student = null;
 
@@ -281,7 +277,7 @@ const applyToJob = async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // Check existing application (some schemas use candidate, some student — check both)
+    // Check existing application
     const existingApp = await Application.findOne({
       $or: [{ job: jobId, candidate: student._id }, { job: jobId, student: student._id }],
     });
@@ -290,11 +286,14 @@ const applyToJob = async (req, res) => {
       return res.status(400).json({ message: "You have already applied for this job" });
     }
 
+    // --- Calculate skill-based match score ---
+    const matchScore = calculateSkillScore(job, student);
+
+    // Create application with matchScore
     const newApplication = await Application.create({
       job: jobId,
-      // Use candidate if your Application schema expects that; if it expects `student`, consider adding student too
-      candidate: student._id,
-      student: student._id,
+      candidate: student._id, //  schema expects 'candidate'
+      matchScore,
       status: "applied",
     });
 
@@ -305,6 +304,12 @@ const applyToJob = async (req, res) => {
     });
   } catch (error) {
     console.error("Error applying to job:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "You’ve already applied to this job",
+      });
+    }
     return res.status(500).json({
       success: false,
       message: "Server error while applying to job",
@@ -312,6 +317,67 @@ const applyToJob = async (req, res) => {
     });
   }
 };
+// old one
+// const applyToJob = async (req, res) => {
+//   try {
+//     const { jobId } = req.params;
+//     // Prefer using user._id if auth middleware sets it; fall back to firebaseId lookup if not
+//     const studentId = req.user?._id || null;
+//     let student = null;
+
+//     if (studentId) {
+//       student = await Student.findById(studentId);
+//     } else if (req.user?.uid) {
+//       student = await Student.findOne({ firebaseId: req.user.uid });
+//     }
+
+//     if (!student) {
+//       return res.status(404).json({ message: "Student not found" });
+//     }
+
+//     const job = await Job.findById(jobId);
+//     if (!job) {
+//       return res.status(404).json({ message: "Job not found" });
+//     }
+
+//     // Check existing application (some schemas use candidate, some student — check both)
+//     const existingApp = await Application.findOne({
+//       $or: [{ job: jobId, candidate: student._id }, { job: jobId, student: student._id }],
+//     });
+
+//     if (existingApp) {
+//       return res.status(400).json({ message: "You have already applied for this job" });
+//     }
+
+//     const newApplication = await Application.create({
+//       job: jobId,
+//       // Use candidate if your Application schema expects that; if it expects `student`, consider adding student too
+//       candidate: student._id,
+//       student: student._id,
+//       status: "applied",
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Application submitted successfully",
+//       application: newApplication,
+//     });
+//   } catch (error) {
+//     console.error("Error applying to job:", error);
+//     //mongoDB error if student tries to apply twice for the same job post
+//     if (error.code === 11000) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "You’ve already applied to this job",
+//       });
+//     }
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while applying to job",
+//       error: error.message,
+//     });
+//   }
+// };
 
 /**
  * Update student profile (allows selective fields)

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { College } from "../models/college.model.js";
 import { Student } from "../models/student.model.js";
-import { Job } from "../models/job.model.js";
+import  Job  from "../models/job.model.js";
 import { Application } from "../models/application.model.js";
 
 // College Signup

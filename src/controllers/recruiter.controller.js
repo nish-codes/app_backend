@@ -1,5 +1,5 @@
 import { Application } from "../models/application.model.js";
-import { Job } from "../models/job.model.js";
+import  Job  from "../models/job.model.js";
 import { Recruiter } from "../models/recruiter.model.js"; 
 
 // Recruiter Signup

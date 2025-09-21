@@ -1,8 +1,8 @@
 import admin from "firebase-admin";
 
-import readFileSync from "fs";
+import { readFileSync } from "fs";
 const serviceAccount = JSON.parse(
-  readFileSync("./src/firebase/serviceAccountKey.json", "utf8"))
+  readFileSync("./src/serviceAccountKey.json", "utf8"))
 
   if(!admin.apps.length) {
     admin.initializeApp({
@@ -12,7 +12,6 @@ const serviceAccount = JSON.parse(
 const auth = admin.auth()
 export {auth}
 
-import serviceAccount from "../../serviceAccountKey.json" with { type: "json" };
 import fs from "fs";
 import path from "path";
 
