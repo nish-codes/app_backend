@@ -1,39 +1,17 @@
 // src/controllers/student.controller.js
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
+
 import Job from "../models/job.model.js";
-import { Application } from "../models/application.model.js";
+
+
+import { Job } from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
-/**
- * Check if a user exists by firebase UID
- */
-const checkUser = async (req, res) => {
-  try {
-    const uid = req.user?.uid;
-    if (!uid) return res.status(400).json({ message: "Missing user UID" });
 
-    const user = await Student.findOne({ firebaseId: uid });
-
-    if (user) {
-      return res.status(200).json({ exists: true, user });
-    } else {
-      return res.status(200).json({ exists: false });
-    }
-  } catch (err) {
-    console.error("Error checking user:", err);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-/**
- * Signup a first-time user
- * - Firebase info (uid, email, name, picture) comes from the verified token
- * - Extra info comes from frontend form
- */
 const signup = async (req, res) => {
-  const { uid, email, name, picture } = req.user || {};
+  const { uid, email, name, picture } = req.user; // decoded from Firebase token
+
   try {
     if (!uid || !email) {
       return res.status(400).json({ message: "Missing Firebase user info" });
@@ -515,7 +493,6 @@ export {
   signup,
   login,
   getJobs,
-  checkUser,
   getHackathons,
   applyToJob,
   updateStudentProfile,
@@ -523,4 +500,5 @@ export {
   getStudentDetails,
   addSkill,
   verifySkill,
+  // getStudentAnalytic
 };

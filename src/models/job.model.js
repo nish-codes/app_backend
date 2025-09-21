@@ -6,8 +6,18 @@ const jobSchema = new mongoose.Schema(
     description: { type: String, required: true },
     recruiter: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      required: false,
       ref: "Recruiter",
+    },
+    college: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: false,
+      ref: "College",
+    },
+    jobType: {
+      type: String,
+      enum: ["company", "on-campus"],
+      default: "company",
     },
     salaryRange: {
       min: { type: Number, required: true },
@@ -19,7 +29,16 @@ const jobSchema = new mongoose.Schema(
       education: { type: String },
       location: { type: String },
     },
+
+    applicationLink: {
+      type: String,
+      required: function() {
+        return this.jobType === "on-campus";
+      }
+    },
+
    
+
   },
   { timestamps: true }
 );

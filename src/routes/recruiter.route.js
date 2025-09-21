@@ -5,8 +5,7 @@ import {
   recruiterSignup, 
   postJob, 
   getApplications, 
-  updateRecruiterProfile, 
-  getRecruiterAnalytics 
+  updateApplicationStatus 
 } from "../controllers/recruiter.controller.js";
 
 const route = Router()
@@ -19,11 +18,8 @@ route.route("/login").post(verifyFirebaseToken, recruiterLogin);
 route.route("/jobs").post(verifyFirebaseToken, postJob);
 route.route("/jobs/:jobId/applications").get(verifyFirebaseToken, getApplications);
 
-// Profile management
-route.route("/profile").put(verifyFirebaseToken, updateRecruiterProfile);
-
-// Analytics
-route.route("/analytics").get(verifyFirebaseToken, getRecruiterAnalytics);
+// Application management
+route.route("/applications/:applicationId/status").put(verifyFirebaseToken, updateApplicationStatus);
 
 export default route;
 
