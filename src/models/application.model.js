@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+
 const applicationSchema = new mongoose.Schema({
     job:{
         type: mongoose.Schema.Types.ObjectId,
@@ -8,7 +9,7 @@ const applicationSchema = new mongoose.Schema({
     candidate :{
         type: mongoose.Schema.Types.ObjectId,
         required: true,
-        ref: 'Candidate',
+        ref: 'Student',  // ✅ CHANGED FROM 'Candidate' TO 'Student'
     },
     status:{
         type: String,

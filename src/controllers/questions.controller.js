@@ -1,5 +1,7 @@
-
-const skills = require("../db/skills.json")
+import fs from "fs";
+import skills from "../db/skills.json" with { type: "json" }
+import totalSkills from "../db/total_skills.json" with { type: "json" }
+import job_preference from "../db/job_preference.json" with { type: "json" }
 const questions = (req, res) => {
     const { lvl, skill } = req.query;
     // Filter skills based on query
@@ -19,9 +21,16 @@ const questions = (req, res) => {
 
     // Picking random questions
     const getRandomItems = (arr, n) => arr.sort(() => 0.5 - Math.random()).slice(0, n);
-    const randomQuestions = getRandomItems(questions, 15);
+    const randomQuestions = getRandomItems(questions, 10);
 
     res.json(randomQuestions);
 }
 
-export { questions };
+const skillNames=(req,res)=>{
+    res.send(totalSkills);
+}
+const jobPreference=(req , res)=>{
+    res.send(job_preference)
+}
+
+export { questions , skillNames , jobPreference};

@@ -1,5 +1,7 @@
 import express from "express";
-import { questions } from "../controllers/questions.controller";
+import { jobPreference, questions, skillNames } from "../controllers/questions.controller.js";
 const router = express.Router();
 router.get('/questions', questions);
+router.get('/getSkills',skillNames);
+router.get('/JobPrefernce',jobPreference)
 export default router;

@@ -29,12 +29,16 @@ const jobSchema = new mongoose.Schema(
       education: { type: String },
       location: { type: String },
     },
+
     applicationLink: {
       type: String,
       required: function() {
         return this.jobType === "on-campus";
       }
     },
+
+   
+
   },
   { timestamps: true }
 );

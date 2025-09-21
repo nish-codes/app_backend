@@ -1,104 +1,135 @@
-
-
-// import { dummy} from "../models/dummy.model.js";
+// src/controllers/student.controller.js
 import { Student } from "../models/student.model.js";
-
+import { studentRequiredSchema } from "../zodschemas/student.js";
 
 import Job from "../models/job.model.js";
 
+
 import { Job } from "../models/job.model.js";
-import { Hackathon } from "../model/hsackathon.model.js";
+import { Hackathon } from "../models/hackathon.model.js";
+
 
 const signup = async (req, res) => {
-  const { uid, email, name, picture } = req.user;// decoded from Firebase token
+  const { uid, email, name, picture } = req.user; // decoded from Firebase token
 
   try {
-    // 1️⃣ Check if user exists
-    let user = await Student.findOne({ firebaseId: uid });
-    if (user) {
-      return res.status(200).json({
-        message: "User already exists",
-        user,
-      });
+    if (!uid || !email) {
+      return res.status(400).json({ message: "Missing Firebase user info" });
     }
 
-    // 2️⃣ Extract additional data from request body
-    const { phone, profile, education } = req.body;
+    // If user already exists
+    let user = await Student.findOne({ firebaseId: uid });
+    if (user) {
+      return res.status(200).json({ message: "User already exists", user });
+    }
 
-    // 3️⃣ Prepare user data - merge Firebase data with request body data
+    // Extract extras from body
+    const {
+      phone,
+      profile = {},
+      education = {},
+      job_preference = [],
+      experience = [],
+      projects = [],
+      user_skills = {},
+    } = req.body || {};
+
+    // Try to validate minimal fields if schema exists (optional)
+    let validated = null;
+    try {
+      if (studentRequiredSchema) {
+        validated = studentRequiredSchema.parse({
+          name: profile?.FullName || name || "",
+          email,
+          phone: phone || "",
+          firebaseId: uid,
+        });
+      }
+    } catch (zerr) {
+      // If validation fails, log but continue building user object
+      console.warn("studentRequiredSchema validation failed:", zerr?.message || zerr);
+    }
+
+    // Build user data (merge both variants safely)
     const userData = {
       firebaseId: uid,
       email,
+      phone: phone || "",
+      studentId: req.body?.studentId || undefined,
       profile: {
-        // Use data from request body if available, otherwise fallback to Firebase data
-        firstName: profile?.firstName || name?.split(" ")[0] || "",
-        lastName: profile?.lastName || (name?.split(" ").length > 1 ? name?.split(" ").slice(1).join(" ") : ""),
+        firstName: profile?.firstName || profile?.FullName || (name ? name.split(" ")[0] : "") || "",
+        lastName:
+          profile?.lastName ||
+          (name && name.split(" ").length > 1 ? name.split(" ").slice(1).join(" ") : "") ||
+          "",
         profilePicture: profile?.profilePicture || picture || "",
-        // Include other profile fields if provided
-        ...(profile?.bio && { bio: profile.bio }),
-        ...(profile?.dateOfBirth && { dateOfBirth: profile.dateOfBirth }),
-        ...(profile?.gender && { gender: profile.gender }),
-        ...(profile?.location && { location: profile.location }),
+        bio: profile?.bio || "",
+        dateOfBirth: profile?.dateOfBirth || undefined,
+        gender: profile?.gender || undefined,
+        location: profile?.location || undefined,
       },
+      education: {
+        college: education?.college || "",
+        universityType: education?.universityType || "",
+        degree: education?.degree || "",
+        collegeEmail: education?.collegeEmail || "",
+        branch: education?.branch || "",
+        year: education?.year || undefined,
+        cgpa: education?.cgpa || undefined,
+        graduationYear: education?.graduationYear || undefined,
+      },
+      job_preference: Array.isArray(job_preference) ? job_preference : [],
+      experience: Array.isArray(experience) ? experience : [],
+      projects: Array.isArray(projects) ? projects : [],
+      user_skills: user_skills || {},
     };
 
-    // 4️⃣ Add phone if provided
-    if (phone) {
-      userData.phone = phone;
-    }
-
-    // 5️⃣ Add education data if provided
-    if (education) {
-      userData.education = {
-        ...(education.college && { college: education.college }),
-        ...(education.degree && { degree: education.degree }),
-        ...(education.branch && { branch: education.branch }),
-        ...(education.year && { year: education.year }),
-        ...(education.cgpa && { cgpa: education.cgpa }),
-        ...(education.graduationYear && { graduationYear: education.graduationYear }),
-      };
-    }
-
-    // 6️⃣ Create new user with all available data
+    // Create user
     user = await Student.create(userData);
 
-    return res.status(201).json({
-      message: "User created successfully",
-      user,
-    });
+    return res.status(201).json({ message: "User created successfully", user });
   } catch (error) {
     console.error("Error during signup:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-      error: error.message,
-    });
+    return res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };
 
+/**
+ * Login — finds student by firebase UID
+ */
 const login = async (req, res) => {
-  const { uid, email } = req.user
+  const { uid } = req.user || {};
   try {
-    const user = await Student.findOne({ firebaseid: uid });
+    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+    // Use consistent field name firebaseId
+    const user = await Student.findOne({ firebaseId: uid });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
     return res.status(200).json({ message: "Login successful", user });
-
-  }
-  catch (error) {
+  } catch (error) {
     console.error("Error during login:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
+};
+
+/**
+ * Get hackathons
+ */
 const getHackathons = async (req, res) => {
   try {
-    const hackathons = await Hackathon.find().sort({ startDate: 1 });
+    const hackathons = await Hackathon.find().sort({ startDate: 1 }).lean();
     return res.status(200).json({ hackathons });
+  } catch (error) {
+    console.error("Error fetching hackathons:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
-  catch (error) {
+};
 
-  }
-}
+/**
+ * Get jobs with filtering + pagination
+ */
 const getJobs = async (req, res) => {
   try {
     const { q, location, skills, page = "1", limit = "20", sort = "-createdAt" } = req.query;
@@ -111,13 +142,8 @@ const getJobs = async (req, res) => {
       filter["preferences.location"] = location.trim();
     }
     if (skills && typeof skills === "string" && skills.trim().length) {
-      const skillArray = skills
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (skillArray.length) {
-        filter["preferences.skills"] = { $in: skillArray };
-      }
+      const skillArray = skills.split(",").map((s) => s.trim()).filter(Boolean);
+      if (skillArray.length) filter["preferences.skills"] = { $in: skillArray };
     }
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
@@ -137,7 +163,8 @@ const getJobs = async (req, res) => {
             model: "Company",
             select: "name industry location logo",
           },
-        }),
+        })
+        .lean(),
       Job.countDocuments(filter),
     ]);
 
@@ -154,36 +181,47 @@ const getJobs = async (req, res) => {
     console.error("Error fetching jobs:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
+};
+
+/**
+ * Apply to a job
+ */
 const applyToJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const studentId = req.user._id;
+    // Prefer using user._id if auth middleware sets it; fall back to firebaseId lookup if not
+    const studentId = req.user?._id || null;
+    let student = null;
 
+    if (studentId) {
+      student = await Student.findById(studentId);
+    } else if (req.user?.uid) {
+      student = await Student.findOne({ firebaseId: req.user.uid });
+    }
 
-    const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-
 
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
 
-
+    // Check existing application (some schemas use candidate, some student — check both)
     const existingApp = await Application.findOne({
-      job: jobId,
-      candidate: studentId,
+      $or: [{ job: jobId, candidate: student._id }, { job: jobId, student: student._id }],
     });
+
     if (existingApp) {
       return res.status(400).json({ message: "You have already applied for this job" });
     }
 
     const newApplication = await Application.create({
       job: jobId,
-      candidate: studentId,
+      // Use candidate if your Application schema expects that; if it expects `student`, consider adding student too
+      candidate: student._id,
+      student: student._id,
       status: "applied",
     });
 
@@ -192,7 +230,6 @@ const applyToJob = async (req, res) => {
       message: "Application submitted successfully",
       application: newApplication,
     });
-
   } catch (error) {
     console.error("Error applying to job:", error);
     return res.status(500).json({
@@ -201,12 +238,16 @@ const applyToJob = async (req, res) => {
       error: error.message,
     });
   }
-}
+};
+
+/**
+ * Update student profile (allows selective fields)
+ */
 const updateStudentProfile = async (req, res) => {
   try {
-    const studentId = req.user._id; // student comes from auth
+    const studentId = req.user?._id;
+    if (!studentId) return res.status(400).json({ message: "Missing student id" });
 
-    // Fields allowed to update
     const allowedUpdates = [
       "email",
       "phone",
@@ -226,17 +267,15 @@ const updateStudentProfile = async (req, res) => {
       "education.year",
       "education.cgpa",
       "education.graduationYear",
-      "user_skills"
+      "user_skills",
     ];
 
-    // Build the updates object dynamically
     const updates = {};
     for (const key of allowedUpdates) {
-      const parts = key.split("."); // handle nested fields
+      const parts = key.split(".");
       if (parts.length === 1) {
         if (req.body[parts[0]] !== undefined) updates[parts[0]] = req.body[parts[0]];
       } else {
-        // nested object
         if (req.body[parts[0]] && req.body[parts[0]][parts[1]] !== undefined) {
           if (!updates[parts[0]]) updates[parts[0]] = {};
           updates[parts[0]][parts[1]] = req.body[parts[0]][parts[1]];
@@ -244,29 +283,70 @@ const updateStudentProfile = async (req, res) => {
       }
     }
 
-    // Update student
+    const updatedStudent = await Student.findByIdAndUpdate(studentId, { $set: updates }, { new: true, runValidators: true });
+    if (!updatedStudent) return res.status(404).json({ message: "Student not found" });
+
+    return res.status(200).json({ success: true, message: "Profile updated successfully", student: updatedStudent });
+  } catch (error) {
+    console.error("Error updating student profile:", error);
+    return res.status(500).json({ success: false, message: "Server error while updating profile", error: error.message });
+  }
+};
+
+/**
+ * Upload profile photo (expects multer to populate req.file)
+ */
+const uploadProfilePhoto = async (req, res) => {
+  try {
+    const studentId = req.user?._id;
+    if (!studentId) return res.status(400).json({ message: "Missing student id" });
+    if (!req.file) return res.status(400).json({ success: false, message: "Please select a profile photo to upload", expectedField: "profilePhoto" });
+
+    // Upload to Cloudinary (uploadOnCloudinary should return { success, url, public_id } or similar)
+    const cloudinaryResult = await uploadOnCloudinary(req.file.path, {
+      folder: "profile_photos",
+      transformation: [
+        { width: 400, height: 400, crop: "fill", gravity: "face" },
+        { quality: "auto:good" },
+        { fetch_format: "auto" },
+      ],
+      tags: ["profile_photo", "student"],
+    });
+
+    if (!cloudinaryResult || !cloudinaryResult.url) {
+      return res.status(500).json({ success: false, message: "Failed to upload profile photo", error: cloudinaryResult?.error || "Upload failed" });
+    }
+
     const updatedStudent = await Student.findByIdAndUpdate(
       studentId,
-      { $set: updates },
+      {
+        $set: {
+          "profile.profilePicture": cloudinaryResult.url,
+          "profile.profilePicturePublicId": cloudinaryResult.public_id || cloudinaryResult.publicId || null,
+          updatedAt: new Date(),
+        },
+      },
       { new: true, runValidators: true }
     );
 
-    if (!updatedStudent) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    if (!updatedStudent) return res.status(404).json({ success: false, message: "Student profile not found" });
 
     return res.status(200).json({
       success: true,
-      message: "Profile updated successfully",
-      student: updatedStudent,
+      message: "Profile photo updated successfully!",
+      data: {
+        profilePicture: cloudinaryResult.url,
+        student: {
+          id: updatedStudent._id,
+          name: `${updatedStudent.profile?.firstName || ""} ${updatedStudent.profile?.lastName || ""}`.trim(),
+          email: updatedStudent.email,
+          profilePicture: updatedStudent.profile?.profilePicture,
+        },
+      },
     });
   } catch (error) {
-    console.error("Error updating student profile:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error while updating profile",
-      error: error.message,
-    });
+    console.error("Error uploading profile photo:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong while uploading your photo", error: error.message });
   }
 };
 export {signup, login, getJobs, getHackathons, applyToJob, updateStudentProfile, getStudentAnalytics};

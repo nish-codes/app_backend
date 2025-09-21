@@ -5,7 +5,7 @@ import jobRoutes from "./routes/jobRoutes.js";   // ✅ here
 import recruiterRoutes from "./routes/recruiter.route.js";
 import collegeRoutes from "./routes/college.route.js";
 import connectDb from "./db/index.js";
-
+import questionRoute from './routes/getQuestions.route.js'
 dotenv.config();
 
 const app = express();
@@ -19,5 +19,7 @@ app.use("/student", studentRoutes);
 app.use("/jobs", jobRoutes);   // ✅ now jobs are available
 app.use("/recruiter", recruiterRoutes);
 app.use("/college", collegeRoutes);
+
+app.use("/skills",questionRoute)
 
 app.listen(3000, () => console.log("Server running on port 3000"));
