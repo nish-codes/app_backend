@@ -19,6 +19,7 @@ const jobSchema = new mongoose.Schema(
       education: { type: String },
       location: { type: String },
     },
+   
   },
   { timestamps: true }
 );

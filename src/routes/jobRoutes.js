@@ -1,7 +1,6 @@
 import express from "express";
 import Job from "../models/job.model.js";
 
-
 const router = express.Router();
 
 // Create job(s)
@@ -9,11 +8,9 @@ router.post("/", async (req, res) => {
   try {
     let jobs;
 
-    // If you send an array → insertMany
     if (Array.isArray(req.body)) {
       jobs = await Job.insertMany(req.body);
     } else {
-      // If you send single object → create
       jobs = await Job.create(req.body);
     }
 
@@ -32,5 +29,8 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+
 
 export default router;

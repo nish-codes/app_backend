@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 
 const studentSchema = new mongoose.Schema({
+    studentId: {
+    type: String,
+    required: true,
+    index: true,
+    unique: true,
+  },
   firebaseId: {
     type: String,
     required: true,
@@ -46,8 +52,7 @@ const studentSchema = new mongoose.Schema({
   },
   user_skills: {
     type: mongoose.Schema.Types.Mixed,
-    default: {}, // Empty object
-    description: "A summary of the user's highest-level skills and their associated badges.",
+    default: {},
   },
 });
 

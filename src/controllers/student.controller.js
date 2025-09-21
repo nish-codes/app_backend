@@ -1,19 +1,11 @@
-
-
-// import { dummy} from "../models/dummy.model.js";
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
-<<<<<<< HEAD
 import Job from "../models/job.model.js";
-
-=======
-import { Job } from "../models/job.model.js";
-import { Hackathon } from "../models/hackathon.model.js";
->>>>>>> origin/main
+import { Application } from "../models/application.model.js";
 
 const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user; // decoded from Firebase token
-  
+
   try {
     // 1️⃣ Check if user exists
     let user = await Student.findOne({ firebaseId: uid });
@@ -21,22 +13,33 @@ const signup = async (req, res) => {
       return res.status(200).json({
         message: "User already exists",
         user,
-      }); 
+      });
     }
 
     // 2️⃣ Extract additional data from request body
     const { phone, profile, education } = req.body;
 
-    // 3️⃣ Prepare user data - merge Firebase data with request body data
+    // 3️⃣ Generate unique studentId
+    const count = await Student.countDocuments();
+    // Pad numbers below 10000, otherwise just use the number
+    const paddedNumber = count + 1 < 10000 
+      ? String(count + 1).padStart(4, "0") 
+      : String(count + 1);
+    const studentId = `STU${paddedNumber}`;
+
+    // 4️⃣ Prepare user data
     const userData = {
+      studentId,
       firebaseId: uid,
       email,
       profile: {
-        // Use data from request body if available, otherwise fallback to Firebase data
         firstName: profile?.firstName || name?.split(" ")[0] || "",
-        lastName: profile?.lastName || (name?.split(" ").length > 1 ? name?.split(" ").slice(1).join(" ") : ""),
+        lastName:
+          profile?.lastName ||
+          (name?.split(" ").length > 1
+            ? name?.split(" ").slice(1).join(" ")
+            : ""),
         profilePicture: profile?.profilePicture || picture || "",
-        // Include other profile fields if provided
         ...(profile?.bio && { bio: profile.bio }),
         ...(profile?.dateOfBirth && { dateOfBirth: profile.dateOfBirth }),
         ...(profile?.gender && { gender: profile.gender }),
@@ -44,12 +47,12 @@ const signup = async (req, res) => {
       },
     };
 
-    // 4️⃣ Add phone if provided
+    // 5️⃣ Add phone if provided
     if (phone) {
       userData.phone = phone;
     }
 
-    // 5️⃣ Add education data if provided
+    // 6️⃣ Add education data if provided
     if (education) {
       userData.education = {
         ...(education.college && { college: education.college }),
@@ -61,7 +64,7 @@ const signup = async (req, res) => {
       };
     }
 
-    // 6️⃣ Create new user with all available data
+    // 7️⃣ Create new user
     user = await Student.create(userData);
 
     return res.status(201).json({
@@ -77,30 +80,83 @@ const signup = async (req, res) => {
   }
 };
 
+export default signup;
+
+
+// ✅ Fixed checkUser function with enhanced debugging
+const checkUser = async (req, res) => {
+  console.log("🔍 checkUser endpoint hit!");
+  console.log("📋 Request headers:", req.headers);
+  console.log("🔑 Request user:", req.user);
+  
+  const { uid } = req.user; // from Firebase token
+  
+  try {
+    console.log("🔍 Checking user with UID:", uid);
+    
+    // Just check if user exists in database - FIXED: firebaseId not firebaseid
+    const user = await Student.findOne({ firebaseId: uid });
+    
+    if (user) {
+      console.log("✅ User found in database!");
+      console.log("👤 User ID:", user._id);
+      console.log("👤 User email:", user.email);
+      
+      // User exists - send to homepage
+      return res.status(200).json({
+        exists: true,
+        user
+      });
+    } else {
+      console.log("❌ User not found in database");
+      
+      // Let's also check what users exist
+      const allUsers = await Student.find({}, 'firebaseId email').limit(5);
+      console.log("📋 Sample users in database:", allUsers);
+      
+      // User doesn't exist - send to register
+      return res.status(404).json({
+        exists: false,
+        message: "User not found"
+      });
+    }
+  } catch (error) {
+    console.error("❌ Error checking user:", error);
+    return res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+  }
+};
+
+// ✅ Fixed login function - corrected field name
 const login = async (req, res) => {
-    const {uid, email} = req.user
+    const { uid, email } = req.user;
     try {
-       const user = await Student.findOne({ firebaseid: uid });
+       // FIXED: firebaseId not firebaseid
+       const user = await Student.findOne({ firebaseId: uid });
         if(!user) {
             return res.status(404).json({message: "User not found"});
         }
         return res.status(200).json({message: "Login successful", user});
-
-}
-catch(error) {
+    }
+    catch(error) {
         console.error("Error during login:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 }
+
 const getHackathons = async (req, res) => {
     try{
         const hackathons = await Hackathon.find().sort({startDate: 1});
         return res.status(200).json({hackathons});
     }
     catch(error){
-
+        console.error("Error fetching hackathons:", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 }
+
 const getJobs = async(req,res)=>{
     try {
         const { q, location, skills, page = "1", limit = "20", sort = "-createdAt" } = req.query;
@@ -108,7 +164,7 @@ const getJobs = async(req,res)=>{
         const filter = {};
         if (q && typeof q === "string" && q.trim().length) {
             filter.$text = { $search: q.trim() };
-        }
+        }getJobs
         if (location && typeof location === "string" && location.trim().length) {
             filter["preferences.location"] = location.trim();
         }
@@ -157,44 +213,43 @@ const getJobs = async(req,res)=>{
         return res.status(500).json({ message: "Internal server error" });
     }
 }
-const applyToJob = async (req, res) => {
-    try {
-    const { jobId } = req.params;
-    const studentId = req.user._id; 
 
+const applyToJob = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const firebaseUid = req.user.uid;
     
-    const student = await Student.findById(studentId);
+    // Change this line:
+    const student = await Student.findOne({ firebaseId: firebaseUid });
+    
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-
     
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
-
     
     const existingApp = await Application.findOne({
       job: jobId,
-      candidate: studentId,
+      candidate: student._id, // Use the actual MongoDB _id
     });
     if (existingApp) {
       return res.status(400).json({ message: "You have already applied for this job" });
     }
-
+    
     const newApplication = await Application.create({
       job: jobId,
-      candidate: studentId,
+      candidate: student._id, // Use the actual MongoDB _id
       status: "applied",
     });
-
+    
     return res.status(201).json({
       success: true,
       message: "Application submitted successfully",
       application: newApplication,
     });
-
   } catch (error) {
     console.error("Error applying to job:", error);
     return res.status(500).json({
@@ -203,7 +258,7 @@ const applyToJob = async (req, res) => {
       error: error.message,
     });
   }
-}
+};
 const updateStudentProfile = async (req, res) => {
   try {
     const studentId = req.user._id; // student comes from auth
@@ -271,5 +326,5 @@ const updateStudentProfile = async (req, res) => {
     });
   }
 };
-export {signup, login, getJobs};
 
+export { signup, login, getJobs, checkUser, getHackathons, applyToJob, updateStudentProfile };
