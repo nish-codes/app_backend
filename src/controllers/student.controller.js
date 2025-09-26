@@ -9,20 +9,28 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 /**
  * Check if a user exists by firebase UID
  */
- const checkUser = async (req, res) => {
+const checkUser = async (req, res) => {
   try {
     const uid = req.user?.uid;
-    if (!uid) return res.status(400).json({ message: "Missing user UID" });
+    console.log("🔍 Checking user with UID:", uid);
+    
+    if (!uid) {
+      console.log("❌ Missing user UID");
+      return res.status(400).json({ message: "Missing user UID" });
+    }
 
     const user = await Student.findOne({ firebaseId: uid });
+    console.log("🔍 Database query result:", user ? "Found" : "Not found");
 
     if (user) {
+      console.log("✅ User exists in database");
       return res.status(200).json({ exists: true, user });
     } else {
+      console.log("👤 User not found in database");
       return res.status(200).json({ exists: false });
     }
   } catch (err) {
-    console.error("Error checking user:", err);
+    console.error("❌ Error checking user:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -32,7 +40,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
  * - Firebase info (uid, email, name, picture) comes from the verified token
  * - Extra info comes from frontend form
  */
- const signup = async (req, res) => {
+const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user || {};
   try {
     if (!uid || !email) {
@@ -45,7 +53,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
       return res.status(200).json({ message: "User already exists", user });
     }
 
-    // Extract extras from body
+    // Extract data from request body
     const {
       phone,
       profile = {},
@@ -56,66 +64,82 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
       user_skills = {},
     } = req.body || {};
 
-    // Try to validate minimal fields if schema exists (optional)
-    let validated = null;
-    try {
-      if (studentRequiredSchema) {
-        validated = studentRequiredSchema.parse({
-          name: profile?.FullName || name || "",
-          email,
-          phone: phone || "",
-          firebaseId: uid,
-        });
-      }
-    } catch (zerr) {
-      // If validation fails, log but continue building user object
-      console.warn("studentRequiredSchema validation failed:", zerr?.message || zerr);
-    }
+    console.log("📝 Request body received:", JSON.stringify(req.body, null, 2));
+    console.log("👤 Firebase user data:", { uid, email, name, picture });
 
-    // Build user data (merge both variants safely)
+    // Build user data with proper field mapping
     const userData = {
       firebaseId: uid,
       email,
       phone: phone || "",
-      studentId: req.body?.studentId || undefined,
+      
       profile: {
-        firstName: profile?.firstName || profile?.FullName || (name ? name.split(" ")[0] : "") || "",
-        lastName:
-          profile?.lastName ||
-          (name && name.split(" ").length > 1 ? name.split(" ").slice(1).join(" ") : "") ||
-          "",
+        // ✅ FIX: Map firstName + lastName to FullName (required by schema)
+        FullName: profile?.FullName || 
+                 (profile?.firstName && profile?.lastName 
+                   ? `${profile.firstName} ${profile.lastName}`
+                   : profile?.firstName || name || "Unknown User"),
+        
         profilePicture: profile?.profilePicture || picture || "",
         bio: profile?.bio || "",
-        dateOfBirth: profile?.dateOfBirth || undefined,
-        gender: profile?.gender || undefined,
-        location: profile?.location || undefined,
       },
+
       education: {
         college: education?.college || "",
-        universityType: education?.universityType || "",
+        
+        // ✅ FIX: Map to correct enum values ["deemed","public","private"]
+        universityType: education?.universityType || 
+                       education?.university || 
+                       "public", // Default fallback to valid enum value
+        
         degree: education?.degree || "",
-        collegeEmail: education?.collegeEmail || "",
-        branch: education?.branch || "",
-        year: education?.year || undefined,
-        cgpa: education?.cgpa || undefined,
-        graduationYear: education?.graduationYear || undefined,
+        collegeEmail: education?.collegeEmail || education?.collegeEmailId || "",
       },
-      job_preference: Array.isArray(job_preference) ? job_preference : [],
+
+      // ✅ FIX: Ensure job_preference is not empty (required in schema)
+      job_preference: Array.isArray(job_preference) && job_preference.length > 0 
+                     ? job_preference 
+                     : ["Software Development"], // Default value
+
       experience: Array.isArray(experience) ? experience : [],
       projects: Array.isArray(projects) ? projects : [],
       user_skills: user_skills || {},
     };
 
+    console.log("💾 User data to be saved:", JSON.stringify(userData, null, 2));
+
     // Create user
     user = await Student.create(userData);
+    console.log("✅ User created successfully:", user._id);
 
-    return res.status(201).json({ message: "User created successfully", user });
+    return res.status(201).json({ 
+      message: "User created successfully", 
+      user,
+      exists: true 
+    });
+
   } catch (error) {
-    console.error("Error during signup:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
+    console.error("❌ Error during signup:", error);
+    
+    // Provide more detailed error information
+    if (error.name === 'ValidationError') {
+      const validationErrors = {};
+      for (let field in error.errors) {
+        validationErrors[field] = error.errors[field].message;
+      }
+      return res.status(400).json({ 
+        message: "Validation failed", 
+        errors: validationErrors,
+        details: error.message 
+      });
+    }
+    
+    return res.status(500).json({ 
+      message: "Internal server error", 
+      error: error.message 
+    });
   }
 };
-
 /**
  * Login — finds student by firebase UID
  */
