@@ -1,5 +1,17 @@
 import admin from "firebase-admin";
-import serviceAccount from "../../serviceAccountKey.json" with { type: "json" };
+
+import { readFileSync } from "fs";
+const serviceAccount = JSON.parse(
+  readFileSync("./src/serviceAccountKey.json", "utf8"))
+
+  if(!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        
+    }) }
+const auth = admin.auth()
+export {auth}
+
 import fs from "fs";
 import path from "path";
 
@@ -24,5 +36,5 @@ try {
   console.error("Error initializing Firebase:", error.message);
 }
 
-export const auth = firebaseInitialized ? admin.auth() : null;
+export const auth1 = firebaseInitialized ? admin.auth() : null;
 export default admin;

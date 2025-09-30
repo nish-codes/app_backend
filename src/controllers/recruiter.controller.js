@@ -1,5 +1,5 @@
 import { Application } from "../models/application.model.js";
-import { Job } from "../models/job.model.js";
+import  Job  from "../models/job.model.js";
 import { Recruiter } from "../models/recruiter.model.js"; 
 
 // Recruiter Signup
@@ -172,204 +172,68 @@ const updateRecruiterProfile = async (req, res) => {
     });
   }
 };
-// Get Analytics for Recruiter
-const getRecruiterAnalytics = async (req, res) => {
+// Update Application Status
+const updateApplicationStatus = async (req, res) => {
   try {
+    const { applicationId } = req.params;
+    const { status } = req.body;
     const recruiterId = req.user._id;
 
-    // Get total jobs posted by this recruiter
-    const totalJobsPosted = await Job.countDocuments({ recruiter: recruiterId });
+    // Validate status
+    const validStatuses = ["applied", "shortlisted", "rejected", "hired"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Must be one of: applied, shortlisted, rejected, hired"
+      });
+    }
 
-    // Get active jobs (jobs posted in last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const activeJobs = await Job.countDocuments({ 
-      recruiter: recruiterId, 
-      createdAt: { $gte: thirtyDaysAgo } 
+    // Find the application and verify the job belongs to this recruiter
+    const application = await Application.findById(applicationId)
+      .populate({
+        path: "job",
+        select: "recruiter title"
+      });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found"
+      });
+    }
+
+    // Check if the job belongs to this recruiter
+    if (application.job.recruiter.toString() !== recruiterId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to update this application"
+      });
+    }
+
+    // Update the application status
+    const updatedApplication = await Application.findByIdAndUpdate(
+      applicationId,
+      { status },
+      { new: true }
+    ).populate({
+      path: "candidate",
+      select: "email profile.firstName profile.lastName"
     });
-
-    // Get total applications received across all jobs
-    const totalApplications = await Application.countDocuments({
-      job: { $in: await Job.find({ recruiter: recruiterId }).distinct('_id') }
-    });
-
-    // Get applications by status
-    const applicationsByStatus = await Application.aggregate([
-      {
-        $lookup: {
-          from: 'jobs',
-          localField: 'job',
-          foreignField: '_id',
-          as: 'jobData'
-        }
-      },
-      {
-        $match: {
-          'jobData.recruiter': recruiterId
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get applications received in last 30 days
-    const recentApplications = await Application.countDocuments({
-      job: { $in: await Job.find({ recruiter: recruiterId }).distinct('_id') },
-      createdAt: { $gte: thirtyDaysAgo }
-    });
-
-    // Get top performing jobs (by application count)
-    const topJobs = await Job.aggregate([
-      {
-        $match: { recruiter: recruiterId }
-      },
-      {
-        $lookup: {
-          from: 'applications',
-          localField: '_id',
-          foreignField: 'job',
-          as: 'applications'
-        }
-      },
-      {
-        $project: {
-          title: 1,
-          createdAt: 1,
-          applicationCount: { $size: '$applications' },
-          hiredCount: {
-            $size: {
-              $filter: {
-                input: '$applications',
-                cond: { $eq: ['$$this.status', 'hired'] }
-              }
-            }
-          }
-        }
-      },
-      {
-        $sort: { applicationCount: -1 }
-      },
-      {
-        $limit: 5
-      }
-    ]);
-
-    // Get monthly job posting trend (last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
-    const monthlyTrend = await Job.aggregate([
-      {
-        $match: {
-          recruiter: recruiterId,
-          createdAt: { $gte: sixMonthsAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          jobsPosted: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 }
-      }
-    ]);
-
-    // Get average applications per job
-    const averageApplicationsPerJob = totalJobsPosted > 0 ? (totalApplications / totalJobsPosted).toFixed(2) : 0;
-
-    // Get conversion rate (hired/applied)
-    const hiredCount = applicationsByStatus.find(item => item._id === 'hired')?.count || 0;
-    const conversionRate = totalApplications > 0 ? ((hiredCount / totalApplications) * 100).toFixed(2) : 0;
-
-    // Get recent activity (last 10 applications)
-    const recentActivity = await Application.aggregate([
-      {
-        $lookup: {
-          from: 'jobs',
-          localField: 'job',
-          foreignField: '_id',
-          as: 'jobData'
-        }
-      },
-      {
-        $match: {
-          'jobData.recruiter': recruiterId
-        }
-      },
-      {
-        $lookup: {
-          from: 'candidates',
-          localField: 'candidate',
-          foreignField: '_id',
-          as: 'candidateData'
-        }
-      },
-      {
-        $project: {
-          status: 1,
-          createdAt: 1,
-          jobTitle: { $arrayElemAt: ['$jobData.title', 0] },
-          candidateName: { 
-            $concat: [
-              { $arrayElemAt: ['$candidateData.profile.firstName', 0] },
-              ' ',
-              { $arrayElemAt: ['$candidateData.profile.lastName', 0] }
-            ]
-          }
-        }
-      },
-      {
-        $sort: { createdAt: -1 }
-      },
-      {
-        $limit: 10
-      }
-    ]);
-
-    const analytics = {
-      overview: {
-        totalJobsPosted,
-        activeJobs,
-        totalApplications,
-        recentApplications,
-        averageApplicationsPerJob: parseFloat(averageApplicationsPerJob),
-        conversionRate: parseFloat(conversionRate)
-      },
-      applicationsByStatus: applicationsByStatus.reduce((acc, item) => {
-        acc[item._id] = item.count;
-        return acc;
-      }, {}),
-      topJobs,
-      monthlyTrend: monthlyTrend.map(item => ({
-        month: `${item._id.year}-${item._id.month.toString().padStart(2, '0')}`,
-        jobsPosted: item.jobsPosted
-      })),
-      recentActivity
-    };
 
     return res.status(200).json({
       success: true,
-      message: "Analytics retrieved successfully",
-      analytics
+      message: "Application status updated successfully",
+      application: updatedApplication
     });
 
   } catch (error) {
-    console.error("Error fetching recruiter analytics:", error);
+    console.error("Error updating application status:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error while fetching analytics",
+      message: "Server error while updating application status",
       error: error.message
     });
   }
 };
 
-export { recruiterSignup, recruiterLogin, postJob, getApplications, updateRecruiterProfile, getRecruiterAnalytics };
+export { recruiterSignup, recruiterLogin, postJob, getApplications, updateApplicationStatus };

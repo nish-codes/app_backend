@@ -1,10 +1,11 @@
 // src/controllers/student.controller.js
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
-import Job from "../models/job.model.js";
 import { Application } from "../models/application.model.js";
+import Job  from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {calculateSkillScore} from './applications.controller.js'
+
 
 /**
  * Check if a user exists by firebase UID
@@ -40,14 +41,16 @@ const checkUser = async (req, res) => {
  * - Firebase info (uid, email, name, picture) comes from the verified token
  * - Extra info comes from frontend form
  */
-const signup = async (req, res) => {
-  const { uid, email, name, picture } = req.user || {};
+
+ const signup = async (req, res) => {
+  const { uid, email, name, picture } = req.user; // decoded from Firebase token
+
   try {
     if (!uid || !email) {
       return res.status(400).json({ message: "Missing Firebase user info" });
     }
 
-    // If user already exists
+    // Check if user already exists
     let user = await Student.findOne({ firebaseId: uid });
     if (user) {
       return res.status(200).json({ message: "User already exists", user });
@@ -62,81 +65,102 @@ const signup = async (req, res) => {
       experience = [],
       projects = [],
       user_skills = {},
+      studentId
     } = req.body || {};
 
     console.log("📝 Request body received:", JSON.stringify(req.body, null, 2));
     console.log("👤 Firebase user data:", { uid, email, name, picture });
 
-    // Build user data with proper field mapping
+    // Build user data according to schema
     const userData = {
+      studentId: studentId || undefined,
       firebaseId: uid,
       email,
       phone: phone || "",
-      
+
       profile: {
-        // ✅ FIX: Map firstName + lastName to FullName (required by schema)
-        FullName: profile?.FullName || 
-                 (profile?.firstName && profile?.lastName 
-                   ? `${profile.firstName} ${profile.lastName}`
-                   : profile?.firstName || name || "Unknown User"),
-        
+        FullName:
+          profile?.FullName ||
+          ((profile?.firstName || name ? name.split(" ")[0] : "") +
+            " " +
+            (profile?.lastName ||
+              (name && name.split(" ").length > 1
+                ? name.split(" ").slice(1).join(" ")
+                : ""))),
         profilePicture: profile?.profilePicture || picture || "",
         bio: profile?.bio || "",
       },
 
       education: {
         college: education?.college || "",
-        
-        // ✅ FIX: Map to correct enum values ["deemed","public","private"]
-        universityType: education?.universityType || 
-                       education?.university || 
-                       "public", // Default fallback to valid enum value
-        
+        universityType: education?.universityType || undefined,
         degree: education?.degree || "",
-        collegeEmail: education?.collegeEmail || education?.collegeEmailId || "",
+        collegeEmail: education?.collegeEmail || "",
+        yearOfPassing: education?.yearOfPassing || null,
       },
 
-      // ✅ FIX: Ensure job_preference is not empty (required in schema)
-      job_preference: Array.isArray(job_preference) && job_preference.length > 0 
-                     ? job_preference 
-                     : ["Software Development"], // Default value
+      // ✅ FIXED user_skills
+      user_skills: user_skills
+        ? Object.entries(user_skills).reduce((acc, [skill, skillData]) => {
+            const levelValue =
+              typeof skillData === "string" ? skillData : skillData.level;
+            acc[skill] = { level: levelValue };
+            return acc;
+          }, {})
+        : {},
 
-      experience: Array.isArray(experience) ? experience : [],
-      projects: Array.isArray(projects) ? projects : [],
-      user_skills: user_skills || {},
+      job_preference:
+        Array.isArray(job_preference) && job_preference.length > 0
+          ? job_preference
+          : ["Software Development"],
+
+      experience: Array.isArray(experience)
+        ? experience.map((exp) => ({
+            nameOfOrg: exp.nameOfOrg || exp.NameOfOrganization || "",
+            position: exp.position || "",
+            timeline: exp.timeline || "",
+            description: exp.description || "",
+          }))
+        : [],
+
+      projects: Array.isArray(projects)
+        ? projects.map((proj) => ({
+            projectName: proj.projectName || "",
+            link: proj.link || "",
+            description: proj.description || "",
+          }))
+        : [],
     };
 
     console.log("💾 User data to be saved:", JSON.stringify(userData, null, 2));
 
-    // Create user
+    // Create user in database
     user = await Student.create(userData);
     console.log("✅ User created successfully:", user._id);
 
-    return res.status(201).json({ 
-      message: "User created successfully", 
+    return res.status(201).json({
+      message: "User created successfully",
       user,
-      exists: true 
+      exists: true,
     });
-
   } catch (error) {
     console.error("❌ Error during signup:", error);
-    
-    // Provide more detailed error information
-    if (error.name === 'ValidationError') {
+
+    if (error.name === "ValidationError") {
       const validationErrors = {};
       for (let field in error.errors) {
         validationErrors[field] = error.errors[field].message;
       }
-      return res.status(400).json({ 
-        message: "Validation failed", 
+      return res.status(400).json({
+        message: "Validation failed",
         errors: validationErrors,
-        details: error.message 
+        details: error.message,
       });
     }
-    
-    return res.status(500).json({ 
-      message: "Internal server error", 
-      error: error.message 
+
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };
@@ -158,6 +182,25 @@ const login = async (req, res) => {
     console.error("Error during login:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
+};
+/**
+ * StudentDetails — sends student details for showing it in the profile or in edit features
+ */
+const getStudentDetails = async (req, res) => {
+    const uid = req.user?.uid;
+
+    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+    try {
+        const user = await Student.findOne({ firebaseId: uid });
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        return res.status(200).json({ message: "User fetched successfully", user });
+    } catch (error) {
+        console.error("Error fetching student details:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
 };
 
 /**
@@ -235,7 +278,6 @@ const getJobs = async (req, res) => {
 const applyToJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    // Prefer using user._id if auth middleware sets it; fall back to firebaseId lookup if not
     const studentId = req.user?._id || null;
     let student = null;
 
@@ -254,30 +296,49 @@ const applyToJob = async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // Check existing application (some schemas use candidate, some student — check both)
+    // Check existing application
     const existingApp = await Application.findOne({
-      $or: [{ job: jobId, candidate: student._id }, { job: jobId, student: student._id }],
+      $or: [
+        { job: jobId, candidate: student._id },
+        { job: jobId, student: student._id }
+      ],
     });
 
     if (existingApp) {
       return res.status(400).json({ message: "You have already applied for this job" });
     }
 
+    // --- Calculate skill-based match score ---
+    const matchScore = calculateSkillScore(job, student);
+
+    // Create application with matchScore
     const newApplication = await Application.create({
       job: jobId,
-      // Use candidate if your Application schema expects that; if it expects `student`, consider adding student too
-      candidate: student._id,
-      student: student._id,
+      candidate: student._id, // schema expects 'candidate'
+      matchScore,
       status: "applied",
     });
 
+    // ✅ Add job to student.saves (like swipe save)
+    await Student.findByIdAndUpdate(
+      student._id,
+      { $addToSet: { saves: jobId } }, // prevents duplicates
+      { new: true }
+    );
+
     return res.status(201).json({
       success: true,
-      message: "Application submitted successfully",
+      message: "Application submitted successfully & job saved",
       application: newApplication,
     });
   } catch (error) {
     console.error("Error applying to job:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "You’ve already applied to this job",
+      });
+    }
     return res.status(500).json({
       success: false,
       message: "Server error while applying to job",
@@ -285,6 +346,68 @@ const applyToJob = async (req, res) => {
     });
   }
 };
+
+// old one
+// const applyToJob = async (req, res) => {
+//   try {
+//     const { jobId } = req.params;
+//     // Prefer using user._id if auth middleware sets it; fall back to firebaseId lookup if not
+//     const studentId = req.user?._id || null;
+//     let student = null;
+
+//     if (studentId) {
+//       student = await Student.findById(studentId);
+//     } else if (req.user?.uid) {
+//       student = await Student.findOne({ firebaseId: req.user.uid });
+//     }
+
+//     if (!student) {
+//       return res.status(404).json({ message: "Student not found" });
+//     }
+
+//     const job = await Job.findById(jobId);
+//     if (!job) {
+//       return res.status(404).json({ message: "Job not found" });
+//     }
+
+//     // Check existing application (some schemas use candidate, some student — check both)
+//     const existingApp = await Application.findOne({
+//       $or: [{ job: jobId, candidate: student._id }, { job: jobId, student: student._id }],
+//     });
+
+//     if (existingApp) {
+//       return res.status(400).json({ message: "You have already applied for this job" });
+//     }
+
+//     const newApplication = await Application.create({
+//       job: jobId,
+//       // Use candidate if your Application schema expects that; if it expects `student`, consider adding student too
+//       candidate: student._id,
+//       student: student._id,
+//       status: "applied",
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Application submitted successfully",
+//       application: newApplication,
+//     });
+//   } catch (error) {
+//     console.error("Error applying to job:", error);
+//     //mongoDB error if student tries to apply twice for the same job post
+//     if (error.code === 11000) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "You’ve already applied to this job",
+//       });
+//     }
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while applying to job",
+//       error: error.message,
+//     });
+//   }
+// };
 
 /**
  * Update student profile (allows selective fields)
@@ -396,4 +519,83 @@ const uploadProfilePhoto = async (req, res) => {
   }
 };
 
-export { signup, login, getJobs, checkUser, getHackathons, applyToJob, updateStudentProfile, uploadProfilePhoto };
+// to add new skill to student's profile
+const addSkill = async (req, res) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  const { skillName } = req.body;
+  if (!skillName) return res.status(400).json({ message: "Skill name is required" });
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // If the skill already exists, do nothing or return a message
+    if (user.user_skills.has(skillName)) {
+      return res.status(400).json({ message: "Skill already exists" });
+    }
+
+    // Add new skill with null level
+    user.user_skills.set(skillName, { level: null });
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Skill added successfully",
+      skills: user.user_skills,
+    });
+  } catch (error) {
+    console.error("Error adding skill:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const verifySkill = async (req, res) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  const { skillName, level } = req.body;
+  if (!skillName || !level) return res.status(400).json({ message: "Skill name and level are required" });
+
+  const allowedLevels = ["beginner", "mid", "adv"];
+  if (!allowedLevels.includes(level)) {
+    return res.status(400).json({ message: "Invalid skill level" });
+  }
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Ensure the skill exists before verifying
+    if (!user.user_skills.has(skillName)) {
+      return res.status(400).json({ message: "Skill does not exist. Add it first." });
+    }
+
+    user.user_skills.set(skillName, { level });
+    await user.save();
+
+    return res.status(200).json({
+      message: "Skill level updated successfully",
+      skills: user.user_skills,
+    });
+  } catch (error) {
+    console.error("Error updating skill level:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export {
+  signup,
+  checkUser,
+  login,
+  getJobs,
+  getHackathons,
+  applyToJob,
+  updateStudentProfile,
+  uploadProfilePhoto,
+  getStudentDetails,
+  addSkill,
+  verifySkill,
+  // getStudentAnalytic
+};

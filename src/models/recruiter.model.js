@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
-import { refine } from "zod";
-import { isValid } from "zod/v3";
+
 const recruiterSchema = new mongoose.Schema({
     firebaseId: {
         type: String,
