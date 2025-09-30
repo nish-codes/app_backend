@@ -283,40 +283,157 @@ const getStudentDetails = async (req, res) => {
 };
 
 // Post On-Campus Opportunity
+// const postOnCampusOpportunity = async (req, res) => {
+//   try {
+//     const collegeId = req.user._id;
+//     const { title, description, salaryRange, preferences, applicationLink } = req.body;
+
+//     if (!title || !description || !salaryRange?.min || !salaryRange?.max || !applicationLink) {
+//       return res
+//         .status(400)
+//         .json({ message: "All required fields must be filled including application link" });
+//     }
+
+//     const newOpportunity = await Job.create({
+//       title,
+//       description,
+//       college: collegeId,
+//       jobType: "on-campus",
+//       salaryRange,
+//       preferences,
+//       applicationLink,
+//     });
+
+//     // Update college stats
+//     await College.findByIdAndUpdate(collegeId, {
+//       $inc: { "activityEngagement.opportunitiesPosted": 1 },
+//       $push: { "activityEngagement.activeOpportunities": newOpportunity._id },
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "On-campus opportunity posted successfully",
+//       opportunity: newOpportunity,
+//     });
+//   } catch (error) {
+//     console.error("Error posting opportunity:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error, could not post opportunity",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const postOnCampusOpportunity = async (req, res) => {
-  try {
-    const collegeId = req.user._id;
-    const { title, description, salaryRange, preferences, applicationLink } = req.body;
-
-    if (!title || !description || !salaryRange?.min || !salaryRange?.max || !applicationLink) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be filled including application link" });
+   try {
+    const { title, description, college, recruiter, jobType, salaryRange, preferences, applicationLink } = req.body;
+    
+    // Validate title
+    if (!title || title.trim() === '') {
+      return res.status(400).json({ message: "Title is required" });
     }
-
-    const newOpportunity = await Job.create({
-      title,
-      description,
-      college: collegeId,
-      jobType: "on-campus",
-      salaryRange,
-      preferences,
-      applicationLink,
-    });
-
-    // Update college stats
-    await College.findByIdAndUpdate(collegeId, {
-      $inc: { "activityEngagement.opportunitiesPosted": 1 },
-      $push: { "activityEngagement.activeOpportunities": newOpportunity._id },
-    });
-
+    
+    // Validate description
+    if (!description || description.trim() === '') {
+      return res.status(400).json({ message: "Description is required" });
+    }
+    
+    // Validate jobType-specific requirements
+    if (jobType === "on-campus") {
+      if (!college || college.trim() === '') {
+        return res.status(400).json({ message: "College is required for on-campus opportunities" });
+      }
+      if (!applicationLink || applicationLink.trim() === '') {
+        return res.status(400).json({ message: "Application link is required for on-campus opportunities" });
+      }
+    }
+    
+    // Validate salary range
+    if (!salaryRange || typeof salaryRange !== 'object') {
+      return res.status(400).json({ message: "Salary range is required" });
+    }
+    
+    if (salaryRange.min === undefined || salaryRange.min === null || salaryRange.min < 0) {
+      return res.status(400).json({ message: "Valid minimum salary is required" });
+    }
+    
+    if (salaryRange.max === undefined || salaryRange.max === null || salaryRange.max < 0) {
+      return res.status(400).json({ message: "Valid maximum salary is required" });
+    }
+    
+    if (salaryRange.min > salaryRange.max) {
+      return res.status(400).json({ message: "Minimum salary cannot be greater than maximum salary" });
+    }
+    
+    // Validate application link format if provided
+    if (applicationLink && applicationLink.trim() !== '') {
+      try {
+        new URL(applicationLink);
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid application link format" });
+      }
+    }
+    
+    // Prepare job data
+    const jobData = {
+      title: title.trim(),
+      description: description.trim(),
+      jobType: jobType || "company",
+      salaryRange: {
+        min: Number(salaryRange.min),
+        max: Number(salaryRange.max)
+      },
+      preferences
+    };
+    
+    // Add optional fields only if provided
+    if (college && college.trim()) jobData.college = college.trim();
+    if (recruiter && recruiter.trim()) jobData.recruiter = recruiter.trim();
+    if (applicationLink && applicationLink.trim()) jobData.applicationLink = applicationLink.trim();
+    
+    // Create the job opportunity
+    const newOpportunity = await Job.create(jobData);
+    
+    // Update college stats if it's an on-campus job
+    if (jobType === "on-campus" && college) {
+      try {
+        const collegeDoc = await College.findOne({ name: college.trim() });
+        if (collegeDoc) {
+          await College.findByIdAndUpdate(collegeDoc._id, {
+            $inc: { "activityEngagement.opportunitiesPosted": 1 },
+            $push: { "activityEngagement.activeOpportunities": newOpportunity._id },
+          });
+        }
+      } catch (collegeUpdateError) {
+        console.warn("Could not update college stats:", collegeUpdateError.message);
+      }
+    }
+    
+    const messageMap = {
+      "on-campus": "On-campus opportunity posted successfully",
+      "company": "Job posted successfully",
+      "external": "External opportunity posted successfully"
+    };
+    
     return res.status(201).json({
       success: true,
-      message: "On-campus opportunity posted successfully",
+      message: messageMap[jobType] || "Job posted successfully",
       opportunity: newOpportunity,
     });
+    
   } catch (error) {
     console.error("Error posting opportunity:", error);
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validationErrors
+      });
+    }
+    
     return res.status(500).json({
       success: false,
       message: "Server error, could not post opportunity",
@@ -325,30 +442,106 @@ const postOnCampusOpportunity = async (req, res) => {
   }
 };
 
+
 // Get On-Campus Opportunities Posted by College
+// const getCollegeOpportunities = async (req, res) => {
+//   try {
+//     const collegeId = req.user._id;
+
+//     // Get opportunities posted by this college
+//     const opportunities = await Job.find({ college: collegeId, jobType: "on-campus" })
+//       .populate("college", "name")
+//       .sort({ createdAt: -1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "College opportunities retrieved successfully",
+//       opportunities
+//     });
+//   } catch (error) {
+//     console.error("Error fetching college opportunities:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while fetching opportunities",
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
 const getCollegeOpportunities = async (req, res) => {
   try {
-    const collegeId = req.user._id;
+    // 1️⃣ Find current student
+    let student;
 
-    // Get opportunities posted by this college
-    const opportunities = await Job.find({ college: collegeId, jobType: "on-campus" })
-      .populate("college", "name")
-      .sort({ createdAt: -1 });
+    if (req.user._id) {
+      student = await Student.findById(req.user._id).select("education.college user_skills");
+    }
 
+    if (!student && req.user.uid) {
+      student = await Student.findOne({ firebaseId: req.user.uid }).select("education.college user_skills");
+    }
+
+    if (!student && req.user._id) {
+      student = await Student.findOne({ firebaseId: req.user._id }).select("education.college user_skills");
+    }
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student profile not found. Please complete your profile setup.",
+        debug: {
+          userId: req.user._id,
+          firebaseUid: req.user.uid
+        }
+      });
+    }
+
+    // 2️⃣ Only fetch on-campus jobs
+    if (student.education && student.education.college) {
+      const collegeName = student.education.college;
+      console.log("🏫 Searching for on-campus jobs at:", collegeName);
+
+      const onCampusJobs = await Job.find({
+        jobType: "on-campus",
+        college: { $regex: new RegExp(collegeName, "i") }
+      }).sort({ createdAt: -1 });
+
+      console.log("🏫 On-campus jobs found:", onCampusJobs.length);
+
+      return res.status(200).json({
+        success: true,
+        message: `Found ${onCampusJobs.length} on-campus opportunities for ${collegeName}`,
+        opportunities: onCampusJobs,
+        totalCount: onCampusJobs.length,
+        searchStrategy: "on-campus",
+        userSkills: student.user_skills ? Object.keys(student.user_skills) : [],
+        hasUserSkills: !!(student.user_skills && Object.keys(student.user_skills).length > 0)
+      });
+    }
+
+    // If student has no college info
     return res.status(200).json({
       success: true,
-      message: "College opportunities retrieved successfully",
-      opportunities
+      message: "No college information found for the student, cannot fetch on-campus jobs.",
+      opportunities: [],
+      totalCount: 0,
+      searchStrategy: "on-campus",
+      userSkills: [],
+      hasUserSkills: false
     });
+
   } catch (error) {
-    console.error("Error fetching college opportunities:", error);
+    console.error("❌ Error fetching on-campus opportunities:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error while fetching opportunities",
+      message: "Server error while fetching on-campus opportunities",
       error: error.message
     });
   }
 };
+
 
 // Update College Profile
 const updateCollegeProfile = async (req, res) => {

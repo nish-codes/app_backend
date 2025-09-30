@@ -1,3 +1,5 @@
+
+// Job Schema (jobModel.js)
 import mongoose from "mongoose";
 
 const jobSchema = new mongoose.Schema(
@@ -5,18 +7,22 @@ const jobSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
     recruiter: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: false,
-      ref: "Recruiter",
+      type: String
+      // type: mongoose.Schema.Types.ObjectId,
+      // required: false,
+      // ref: "Recruiter",
     },
     college: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: false,
-      ref: "College",
+      type: String,
+      required: function() {
+        return this.jobType === "on-campus";
+      }
+      // type: mongoose.Schema.Types.ObjectId,
+      // ref: "College",
     },
     jobType: {
       type: String,
-      enum: ["company", "on-campus","external"],
+      enum: ["company", "on-campus", "external"],
       default: "company",
     },
     salaryRange: {
@@ -29,16 +35,12 @@ const jobSchema = new mongoose.Schema(
       education: { type: String },
       location: { type: String },
     },
-
     applicationLink: {
       type: String,
       required: function() {
         return this.jobType === "on-campus";
       }
-    },
-
-   
-
+    }
   },
   { timestamps: true }
 );

@@ -16,7 +16,7 @@ route.route("/login").post(verifyFirebaseToken, recruiterLogin);
 
 // Job management routes
 route.route("/jobs").post(verifyFirebaseToken, postJob);
-route.route("/jobs/:jobId/applications").get(verifyFirebaseToken, getApplications);
+route.route("/jobs").get(verifyFirebaseToken, getApplications);
 
 // Application management
 route.route("/applications/:applicationId/status").put(verifyFirebaseToken, updateApplicationStatus);

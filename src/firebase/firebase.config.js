@@ -1,40 +1,34 @@
+// firebaseAdmin.js
 import admin from "firebase-admin";
-
-import { readFileSync } from "fs";
-const serviceAccount = JSON.parse(
-  readFileSync("./src/serviceAccountKey.json", "utf8"))
-
-  if(!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        
-    }) }
-const auth = admin.auth()
-export {auth}
-
 import fs from "fs";
 import path from "path";
 
-
-// Initialize Firebase Admin (only if service account key exists)
 let firebaseInitialized = false;
 
 try {
-  const serviceAccountPath = path.resolve("serviceAccountKey.json");
+  // Change this line to look in the project root instead of src folder
+  const serviceAccountPath = path.resolve("./serviceAccountKey.json");
+  console.log("🔍 Looking for service account at:", serviceAccountPath);
+  
   if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    firebaseInitialized = true;
-    console.log("Firebase Admin initialized successfully");
+    const serviceAccount = JSON.parse(
+      fs.readFileSync(serviceAccountPath, "utf8")
+    );
+    
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      firebaseInitialized = true;
+      console.log("✅ Firebase Admin initialized successfully");
+    }
   } else {
-    console.warn("Firebase service account not found. Firebase features will be disabled.");
-    console.warn("To enable Firebase, add your serviceAccountKey.json file to the project root.");
+    console.warn("⚠️ Firebase service account not found at:", serviceAccountPath);
+    console.warn("👉 Place `serviceAccountKey.json` in the project root folder.");
   }
 } catch (error) {
-  console.error("Error initializing Firebase:", error.message);
+  console.error("❌ Error initializing Firebase:", error.message);
 }
 
-export const auth1 = firebaseInitialized ? admin.auth() : null;
+export const auth = firebaseInitialized ? admin.auth() : null;
 export default admin;

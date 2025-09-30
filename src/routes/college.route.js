@@ -22,7 +22,8 @@ route.route("/students").get(verifyFirebaseToken, getCollegeStudents);
 route.route("/students/:studentId").get(verifyFirebaseToken, getStudentDetails);
 
 // On-campus opportunities
-route.route("/opportunities").post(verifyFirebaseToken, postOnCampusOpportunity);
+// route.route("/opportunities").post(verifyFirebaseToken, postOnCampusOpportunity);
+route.route("/opportunities").post( postOnCampusOpportunity);
 route.route("/opportunities").get(verifyFirebaseToken, getCollegeOpportunities);
 
 // Profile management

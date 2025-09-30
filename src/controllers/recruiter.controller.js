@@ -1,6 +1,7 @@
 import { Application } from "../models/application.model.js";
 import  Job  from "../models/job.model.js";
 import { Recruiter } from "../models/recruiter.model.js"; 
+import { Student } from "../models/student.model.js";
 
 // Recruiter Signup
 const recruiterSignup = async (req, res) => {
@@ -91,40 +92,218 @@ const postJob = async (req, res) => {
 };
 
 // Get Applications for a Job
+// const getApplications = async (req, res) => {
+//   try {
+//     const { jobId } = req.params;
+//     const recruiterId = req.user._id;
+
+//     const job = await Job.findOne({ _id: jobId, recruiter: recruiterId });
+//     if (!job) {
+//       return res
+//         .status(404)
+//         .json({ message: "Job not found or not owned by recruiter" });
+//     }
+
+//     const applications = await Application.find({ job: jobId })
+//       .populate({
+//         path: "candidate",
+//         select:
+//           "email profile.firstName profile.lastName education user_skills",
+//       })
+//       .sort({ createdAt: -1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       jobId,
+//       applications,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching applications:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while fetching applications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+const getUserSkillsArray = (userSkills) => {
+  if (!userSkills) return [];
+  if (userSkills instanceof Map) return Array.from(userSkills.keys());
+  if (typeof userSkills === "object" && userSkills !== null) return Object.keys(userSkills);
+  return [];
+};
+
+
 const getApplications = async (req, res) => {
   try {
-    const { jobId } = req.params;
-    const recruiterId = req.user._id;
-
-    const job = await Job.findOne({ _id: jobId, recruiter: recruiterId });
-    if (!job) {
-      return res
-        .status(404)
-        .json({ message: "Job not found or not owned by recruiter" });
+    console.log("🔍 Auth Debug - req.user:", req.user);
+    
+    // 1️⃣ Find current student - try both _id and firebaseId
+    let student;
+    
+    if (req.user._id) {
+      student = await Student.findById(req.user._id).select("education.college user_skills");
+    }
+    
+    if (!student && req.user.uid) {
+      student = await Student.findOne({ firebaseId: req.user.uid }).select("education.college user_skills");
+    }
+    
+    if (!student && req.user._id) {
+      student = await Student.findOne({ firebaseId: req.user._id }).select("education.college user_skills");
+    }
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student profile not found. Please complete your profile setup.",
+        debug: {
+          userId: req.user._id,
+          firebaseUid: req.user.uid
+        }
+      });
     }
 
-    const applications = await Application.find({ job: jobId })
-      .populate({
-        path: "candidate",
-        select:
-          "email profile.firstName profile.lastName education user_skills",
-      })
-      .sort({ createdAt: -1 });
+    console.log("👤 Student found:", student.profile?.FullName || "Unknown");
+    console.log("🎓 Student college:", student.education?.college || "None");
+    console.log("🛠️ Raw user_skills:", student.user_skills);
 
-    return res.status(200).json({
+    const userSkillsArray = getUserSkillsArray(student.user_skills);
+    const hasUserSkills = userSkillsArray.length > 0;
+
+    console.log("🛠️ User skills array:", userSkillsArray);
+    console.log("✅ Has user skills:", hasUserSkills);
+
+    let opportunities = [];
+    let searchStrategy = "";
+    
+    // 2️⃣ Priority 1: Skills-based company jobs
+    if (hasUserSkills) {
+      console.log("🎯 Searching for skills-based jobs...");
+      
+// Escape regex special characters
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const companyJobs = await Job.find({
+  jobType: "company",
+  "preferences.skills": {
+    $in: userSkillsArray.map((skill) => 
+      new RegExp(`^${escapeRegex(skill)}$`, "i")
+    ),
+  },
+}).sort({ createdAt: -1 });
+
+      console.log("💼 Skills-based jobs found:", companyJobs.length);
+
+      if (companyJobs.length > 0) {
+        const skillMatchedJobs = companyJobs.map((job) => {
+          const matchingSkills = job.preferences.skills.filter((jobSkill) =>
+            userSkillsArray.some(
+              (userSkill) => userSkill.toLowerCase().trim() === jobSkill.toLowerCase().trim()
+            )
+          );
+          return {
+            ...job.toObject(),
+            matchingSkills,
+            matchingSkillsCount: matchingSkills.length,
+            priority: "skills-based"
+          };
+        });
+
+        // Sort by match count, then recency
+        skillMatchedJobs.sort((a, b) => {
+          if (b.matchingSkillsCount !== a.matchingSkillsCount) {
+            return b.matchingSkillsCount - a.matchingSkillsCount;
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+
+        opportunities = [...opportunities, ...skillMatchedJobs];
+      }
+    }
+    
+    // 3️⃣ Priority 2: General company jobs (fallback)
+    if (opportunities.length === 0 || !hasUserSkills) {
+      console.log("📋 Fetching general company jobs...");
+      
+      const generalJobs = await Job.find({ jobType: "company" })
+        .sort({ createdAt: -1 })
+        .limit(10);
+
+      console.log("📋 General jobs found:", generalJobs.length);
+
+      const generalJobsWithPriority = generalJobs.map(job => ({
+        ...job.toObject(),
+        priority: "general"
+      }));
+
+      if (hasUserSkills && opportunities.length > 0) {
+        // If we already have skills-based jobs, skip general ones
+      } else {
+        opportunities = [...opportunities, ...generalJobsWithPriority];
+      }
+    }
+
+    // 4️⃣ Determine search strategy
+    const skillsCount = opportunities.filter(j => j.priority === "skills-based").length;
+    const generalCount = opportunities.filter(j => j.priority === "general").length;
+
+    if (skillsCount > 0) {
+      searchStrategy = "skills-based";
+    } else {
+      searchStrategy = "general";
+    }
+
+    // 5️⃣ Response message
+    const getMessageDetails = () => {
+      const parts = [];
+      if (skillsCount > 0) parts.push(`${skillsCount} skills-matched`);
+      if (generalCount > 0) parts.push(`${generalCount} general`);
+      
+      return `Found ${opportunities.length} opportunities: ${parts.join(", ")}`;
+    };
+
+    const response = {
       success: true,
-      jobId,
-      applications,
-    });
+      message: getMessageDetails(),
+      opportunities,
+      totalCount: opportunities.length,
+      searchStrategy,
+      userSkills: userSkillsArray,
+      hasUserSkills,
+      breakdown: {
+        skillsBased: skillsCount,
+        general: generalCount
+      }
+    };
+
+    if (skillsCount > 0) {
+      response.skillMatchDetails = opportunities
+        .filter(job => job.priority === "skills-based")
+        .map((job) => ({
+          jobId: job._id,
+          title: job.title,
+          matchingSkills: job.matchingSkills || [],
+          matchingSkillsCount: job.matchingSkillsCount || 0,
+          totalRequiredSkills: job.preferences?.skills?.length || 0,
+        }));
+    }
+
+    return res.status(200).json(response);
   } catch (error) {
-    console.error("Error fetching applications:", error);
+    console.error("❌ Error in getApplications:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error while fetching applications",
-      error: error.message,
+      message: "Server error while fetching opportunities",
+      error: error.message
     });
   }
 };
+
+
+
+
 const updateRecruiterProfile = async (req, res) => {
   try {
     const recruiterId = req.user._id; // recruiter comes from auth
