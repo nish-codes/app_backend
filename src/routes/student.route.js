@@ -2,7 +2,7 @@ import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
-import { signup,checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile , uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
+import { signup,checkUser, login,fetchsaves,fetchAppliedJobs, getJobs, getHackathons, applyToJob, updateStudentProfile , uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
 
 const router = Router();
 
@@ -30,7 +30,10 @@ router.get("/jobs", verifyFirebaseToken, getJobs);
 router.get("/hackathons", verifyFirebaseToken, getHackathons);
 
 // Action routes
-router.post("/jobs/:jobId/apply", verifyFirebaseToken, applyToJob);
+router.post("/jobs/:jobId/:jobtype/apply", verifyFirebaseToken, applyToJob);
 router.put("/profile", verifyFirebaseToken, updateStudentProfile);
 
+
+router.get('/saves',verifyFirebaseToken,fetchsaves)
+router.get('/fetchappliedjobs',verifyFirebaseToken,fetchAppliedJobs)
 export default router;
