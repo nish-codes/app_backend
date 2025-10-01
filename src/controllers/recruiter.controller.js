@@ -2,6 +2,7 @@ import { Application } from "../models/application.model.js";
 import  Job  from "../models/job.model.js";
 import { Recruiter } from "../models/recruiter.model.js"; 
 import { Student } from "../models/student.model.js";
+import { Company } from "../models/company.model.js";
 
 // Recruiter Signup
 const recruiterSignup = async (req, res) => {
@@ -14,6 +15,12 @@ const recruiterSignup = async (req, res) => {
       return res.status(400).json({ message: "Recruiter already exists" });
     }
 
+    // Validate company exists
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
     const newRecruiter = await Recruiter.create({
       firebaseId: uid,
       email,
@@ -23,9 +30,22 @@ const recruiterSignup = async (req, res) => {
       companyId,
     });
 
+    // Add recruiter to company's recruiters array
+    await Company.findByIdAndUpdate(
+      companyId,
+      { $push: { recruiters: newRecruiter._id } }
+    );
+
+    // Populate company information in response
+    const recruiterWithCompany = await Recruiter.findById(newRecruiter._id)
+      .populate("companyId", "name industry location logo");
+
     return res
       .status(201)
-      .json({ message: "Recruiter created successfully", user: newRecruiter });
+      .json({ 
+        message: "Recruiter created successfully", 
+        user: recruiterWithCompany 
+      });
   } catch (error) {
     console.error("Error during recruiter signup:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -37,7 +57,8 @@ const recruiterLogin = async (req, res) => {
   const { uid } = req.user;
 
   try {
-    const recruiter = await Recruiter.findOne({ firebaseId: uid });
+    const recruiter = await Recruiter.findOne({ firebaseId: uid })
+      .populate("companyId", "name industry location logo");
     if (!recruiter) {
       return res.status(404).json({ message: "Recruiter not found" });
     }
@@ -62,10 +83,17 @@ const postJob = async (req, res) => {
         .json({ message: "All required fields must be filled" });
     }
 
+    // Get recruiter with company information
+    const recruiter = await Recruiter.findById(recruiterId).select("companyId");
+    if (!recruiter) {
+      return res.status(404).json({ message: "Recruiter not found" });
+    }
+
     const newJob = await Job.create({
       title,
       description,
       recruiter: recruiterId,
+      company: recruiter.companyId,
       salaryRange,
       preferences,
     });
@@ -76,10 +104,21 @@ const postJob = async (req, res) => {
       $push: { "activityEngagement.activeJobs": newJob._id },
     });
 
+    // Add job to company's jobs array
+    await Company.findByIdAndUpdate(
+      recruiter.companyId,
+      { $push: { jobs: newJob._id } }
+    );
+
+    // Populate job with recruiter and company information
+    const populatedJob = await Job.findById(newJob._id)
+      .populate("recruiter", "name email designation")
+      .populate("company", "name industry location logo");
+
     return res.status(201).json({
       success: true,
       message: "Job posted successfully",
-      job: newJob,
+      job: populatedJob,
     });
   } catch (error) {
     console.error("Error posting job:", error);
@@ -192,7 +231,10 @@ const companyJobs = await Job.find({
       new RegExp(`^${escapeRegex(skill)}$`, "i")
     ),
   },
-}).sort({ createdAt: -1 });
+})
+.populate("recruiter", "name email designation")
+.populate("company", "name industry location logo")
+.sort({ createdAt: -1 });
 
       console.log("💼 Skills-based jobs found:", companyJobs.length);
 
@@ -228,6 +270,8 @@ const companyJobs = await Job.find({
       console.log("📋 Fetching general company jobs...");
       
       const generalJobs = await Job.find({ jobType: "company" })
+        .populate("recruiter", "name email designation")
+        .populate("company", "name industry location logo")
         .sort({ createdAt: -1 })
         .limit(10);
 

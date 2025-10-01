@@ -1,0 +1,47 @@
+[33mcommit a9c801219f6ae9fb2a9d5284f1422ada71863245[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Nishanth <nishanth24106@gmail.com>
+Date:   Sun Sep 14 21:06:42 2025 +0530
+
+    additional controller for recruiter and student
+
+[33mcommit 24e4f0706840e3246c4590602c29a047bb24df04[m[33m ([m[1;31morigin/main[m[33m)[m
+Author: Harish Siddartha <harishranjithkumar@gmail.com>
+Date:   Sun Sep 7 00:28:12 2025 +0530
+
+    One-to-One Chat
+
+[33mcommit df92b3e7a7c854ced7b7a97e2096ea408898d02f[m
+Author: Nishanth <nishanth24106@gmail.com>
+Date:   Wed Aug 27 14:30:46 2025 +0530
+
+    job retrieval controller
+
+[33mcommit 0127bcf85ebf9f5738f3ea2f6245ea1a7035bc7b[m
+Author: Nishanth <nishanth24106@gmail.com>
+Date:   Mon Aug 25 23:28:19 2025 +0530
+
+    job and hackathon controller
+
+[33mcommit 15851fb238f3efb66c93bdb90bc9f086a6357b97[m
+Author: Nishanth <nishanth24106@gmail.com>
+Date:   Sun Aug 24 16:15:51 2025 +0530
+
+    models in recruiter and candidate side
+
+[33mcommit 93c7a2ed923ea057909b574dfbb352892debbb2a[m
+Author: CrazyCoder-Ash <achudhan152006@gmail.com>
+Date:   Sun Aug 10 15:12:14 2025 +0530
+
+    created models for tests,questions,Test Results...Updated student and dummy models
+
+[33mcommit cfc726fecc94e37934a64275940494d8f4bd207b[m
+Author: Nishanth <nishanth24106@gmail.com>
+Date:   Mon Aug 4 21:58:24 2025 +0530
+
+    signup and integration with firebase
+
+[33mcommit a61860e2212d740d220f0851fad5025897b77136[m
+Author: Nishanth <nishanth24106@gmail.com>
+Date:   Sat Aug 2 17:46:22 2025 +0530
+
+    basic structure and db connect

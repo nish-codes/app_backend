@@ -7,10 +7,14 @@ const jobSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, required: true },
     recruiter: {
-      type: String
-      // type: mongoose.Schema.Types.ObjectId,
-      // required: false,
-      // ref: "Recruiter",
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "Recruiter",
+    },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "Company",
     },
     college: {
       type: String,
