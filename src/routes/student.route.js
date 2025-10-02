@@ -3,9 +3,33 @@ import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 
-import { signup,checkUser, login,fetchsaves,fetchAppliedJobs, getJobs, getHackathons, applyToJob, updateStudentProfile , uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
+
+
 
 import { signup,checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile , uploadProfilePhoto, getStudentDetails, verifySkill, addSkill, getApplicationCounts, getAppliedApplicationsCount, getShortlistedApplicationsCount, getApplications, getStudentAnalytics } from "../controllers/student.controller.js";
+
+import {   signup,
+    checkUser,
+    login,
+    getJobs,
+    getHackathons,
+    applyToJob,
+    updateStudentProfile,
+    uploadProfilePhoto,
+    getStudentDetails,
+    addSkill,
+    verifySkill,
+  
+    fetchsaves,
+    fetchAppliedJobs,
+  
+    getApplicationCounts,
+    getAppliedApplicationsCount,
+    getShortlistedApplicationsCount,
+    getApplications,
+    getStudentAnalytics,
+   } from "../controllers/student.controller.js";
+
 
 
 const router = Router();

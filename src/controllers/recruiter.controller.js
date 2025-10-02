@@ -73,62 +73,108 @@ const recruiterLogin = async (req, res) => {
 // Post Job
 const postJob = async (req, res) => {
   try {
-    const recruiterId = req.user._id;
+    const { 
+      title, 
+      description, 
+      salaryRange, 
+      recruiter,   // directly from body
+      company,     // directly from body
+      preferences, 
+      jobType, 
+      college, 
+      applicationLink 
+    } = req.body;
 
-    const { title, description, salaryRange, preferences } = req.body;
-
+    // Validate required fields
     if (!title || !description || !salaryRange?.min || !salaryRange?.max) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be filled" });
+      return res.status(400).json({ 
+        message: "Title, description, and salary range are required" 
+      });
     }
 
-    // Get recruiter with company information
-    const recruiter = await Recruiter.findById(recruiterId).select("companyId");
-    if (!recruiter) {
-      return res.status(404).json({ message: "Recruiter not found" });
+    // Validate jobType
+    if (!jobType || !["company", "on-campus", "external"].includes(jobType)) {
+      return res.status(400).json({ 
+        message: "Valid jobType is required (company, on-campus, or external)" 
+      });
     }
 
-    const newJob = await Job.create({
-      title,
-      description,
-      recruiter: recruiterId,
-      company: recruiter.companyId,
-      salaryRange,
-      preferences,
-    });
+    let jobData = { 
+      title, 
+      description, 
+      salaryRange, 
+      preferences: preferences || {}, 
+      jobType 
+    };
 
-    // Update recruiter stats
-    await Recruiter.findByIdAndUpdate(recruiterId, {
-      $inc: { "activityEngagement.jobsPosted": 1 },
-      $push: { "activityEngagement.activeJobs": newJob._id },
-    });
+    if (jobType === "on-campus") {
+      if (!college || !applicationLink) {
+        return res.status(400).json({ 
+          message: "College and application link are required for on-campus jobs" 
+        });
+      }
+      jobData.college = college;
+      jobData.applicationLink = applicationLink;
+    } else {
+      if (!recruiter || !company) {
+        return res.status(400).json({ 
+          message: "Recruiter and company are required for company/external jobs" 
+        });
+      }
+      jobData.recruiter = recruiter;
+      jobData.company = company;
+    }
 
-    // Add job to company's jobs array
-    await Company.findByIdAndUpdate(
-      recruiter.companyId,
-      { $push: { jobs: newJob._id } }
-    );
+    // Create job
+    const newJob = await Job.create(jobData);
 
-    // Populate job with recruiter and company information
-    const populatedJob = await Job.findById(newJob._id)
-      .populate("recruiter", "name email designation")
-      .populate("company", "name industry location logo");
+    // Update recruiter + company stats only for company/external jobs
+    if (jobType !== "on-campus") {
+      await Recruiter.findByIdAndUpdate(recruiter, {
+        $inc: { "activityEngagement.jobsPosted": 1 },
+        $push: { "activityEngagement.activeJobs": newJob._id },
+      });
+
+      await Company.findByIdAndUpdate(company, {
+        $push: { jobs: newJob._id }
+      });
+    }
+
+    // Populate recruiter & company for company/external
+    let populatedJob;
+    if (jobType === "on-campus") {
+      populatedJob = await Job.findById(newJob._id);
+    } else {
+      populatedJob = await Job.findById(newJob._id)
+        .populate("recruiter", "name email designation")
+        .populate("company", "name industry location logo");
+    }
 
     return res.status(201).json({
       success: true,
       message: "Job posted successfully",
       job: populatedJob,
     });
+
   } catch (error) {
     console.error("Error posting job:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error, could not post job",
-      error: error.message,
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: "Validation failed", 
+        errors 
+      });
+    }
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
     });
   }
 };
+
+
 
 // Get Applications for a Job
 // const getApplications = async (req, res) => {
