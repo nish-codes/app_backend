@@ -961,11 +961,20 @@ export {
   fetchsaves,
   fetchAppliedJobs,
 
+
+  fetchsaves,
+  fetchAppliedJobs
+,
+
   getApplicationCounts,
   getAppliedApplicationsCount,
   getShortlistedApplicationsCount,
   getApplications,
+
   getStudentAnalytics,
 
+
+
+  getStudentAnalytics
 
 };
