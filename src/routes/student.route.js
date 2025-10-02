@@ -2,11 +2,11 @@ import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
-<<<<<<< HEAD
+
 import { signup,checkUser, login,fetchsaves,fetchAppliedJobs, getJobs, getHackathons, applyToJob, updateStudentProfile , uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
-=======
+
 import { signup,checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile , uploadProfilePhoto, getStudentDetails, verifySkill, addSkill, getApplicationCounts, getAppliedApplicationsCount, getShortlistedApplicationsCount, getApplications, getStudentAnalytics } from "../controllers/student.controller.js";
->>>>>>> 7ea7f53039015b64c5708fdfd1ddd53ee2a12128
+
 
 const router = Router();
 
