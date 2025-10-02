@@ -1,7 +1,7 @@
 // src/controllers/student.controller.js
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
-import { Application } from "../models/application.model.js";
+import { Application } from "../models/application.model.js"
 import Job  from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
 import {calculateSkillScore} from './applications.controller.js'
@@ -203,6 +203,88 @@ const getStudentDetails = async (req, res) => {
     }
 };
 
+
+const fetchsaves = async(req, res) => {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+    
+    try {
+        const user = await Student.findOne({ firebaseId: uid })
+            .populate({
+                path: 'saves',
+                populate: [
+                    { path: 'company', select: 'name logo' },
+                    { path: 'recruiter', select: 'name email' }
+                ]
+            });
+            
+        if (!user) return res.status(404).json({ message: "User not found" });
+        
+        return res.status(200).json({ 
+            message: "Saved jobs fetched successfully", 
+            saves: user.saves 
+        });
+    } catch (error) {
+        console.error("Error fetching saved jobs:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+const removeFromSaves = async(req, res) => {
+    const uid = req.user?.uid;
+    const { jobId } = req.params;
+    
+    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+    
+    try {
+        const user = await Student.findOne({ firebaseId: uid });
+        if (!user) return res.status(404).json({ message: "User not found" });
+        
+        user.saves = user.saves.filter(id => id.toString() !== jobId);
+        await user.save();
+        
+        return res.status(200).json({ message: "Job removed from saves" });
+    } catch (error) {
+        console.error("Error removing saved job:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+const fetchAppliedJobs = async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(400).json({ success: false, message: "Missing Firebase UID" });
+    }
+    
+    const student = await Student.findOne({ firebaseId: uid });
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+    
+    // ✅ Populate job AND nested company/recruiter
+    const applications = await Application.find({ candidate: student._id })
+      .populate({
+        path: "job",
+        populate: [
+          { path: "company", select: "name logo" },
+          { path: "recruiter", select: "name email" }
+        ]
+      })
+      .exec();
+    
+    return res.status(200).json({
+      success: true,
+      message: `Found ${applications.length} applied jobs`,
+      applications,
+    });
+  } catch (error) {
+    console.error("Error fetching applied jobs:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 /**
  * Get hackathons
  */
@@ -277,68 +359,93 @@ const getJobs = async (req, res) => {
  */
 const applyToJob = async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const { jobId, jobtype } = req.params;
     const studentId = req.user?._id || null;
     let student = null;
-
+    
     if (studentId) {
       student = await Student.findById(studentId);
     } else if (req.user?.uid) {
       student = await Student.findOne({ firebaseId: req.user.uid });
     }
-
+    
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-
+    
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
-
-    // Check existing application
-    const existingApp = await Application.findOne({
-      $or: [
-        { job: jobId, candidate: student._id },
-        { job: jobId, student: student._id }
-      ],
-    });
-
-    if (existingApp) {
-      return res.status(400).json({ message: "You have already applied for this job" });
+    
+    // Handle based on jobtype
+    if (jobtype === "on-campus") {
+      // Check if already applied (saved in student.saves)
+      if (student.saves.some(savedJobId => savedJobId.toString() === jobId)) {
+        return res.status(400).json({ 
+          message: "You have already applied for this on-campus job" 
+        });
+      }
+      
+      // Add to student's saves array
+      student.saves.push(jobId);
+      await student.save();
+      
+      return res.status(201).json({
+        success: true,
+        message: "Application submitted successfully for on-campus job",
+        jobId: jobId,
+      });
+      
+    } else if (jobtype === "company") {
+      // Check existing application in Application collection
+      const existingApp = await Application.findOne({
+        $or: [
+          { job: jobId, candidate: student._id }, 
+          { job: jobId, student: student._id }
+        ],
+      });
+      
+      if (existingApp) {
+        return res.status(400).json({ 
+          message: "You have already applied for this company job" 
+        });
+      }
+      
+      // Calculate skill-based match score
+      const matchScore = calculateSkillScore(job, student);
+      
+      // Create application with matchScore
+      const newApplication = await Application.create({
+        job: jobId,
+        candidate: student._id,
+        matchScore,
+        status: "applied",
+      });
+      
+      return res.status(201).json({
+        success: true,
+        message: "Application submitted successfully for company job",
+        application: newApplication,
+      });
+      
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid job type. Must be 'company' or 'on-campus'",
+      });
     }
-
-    // --- Calculate skill-based match score ---
-    const matchScore = calculateSkillScore(job, student);
-
-    // Create application with matchScore
-    const newApplication = await Application.create({
-      job: jobId,
-      candidate: student._id, // schema expects 'candidate'
-      matchScore,
-      status: "applied",
-    });
-
-    // ✅ Add job to student.saves (like swipe save)
-    await Student.findByIdAndUpdate(
-      student._id,
-      { $addToSet: { saves: jobId } }, // prevents duplicates
-      { new: true }
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: "Application submitted successfully & job saved",
-      application: newApplication,
-    });
+    
   } catch (error) {
     console.error("Error applying to job:", error);
+    
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: "You’ve already applied to this job",
+        message: "You've already applied to this job",
       });
     }
+    
     return res.status(500).json({
       success: false,
       message: "Server error while applying to job",
@@ -346,6 +453,7 @@ const applyToJob = async (req, res) => {
     });
   }
 };
+
 
 // old one
 // const applyToJob = async (req, res) => {
@@ -585,6 +693,258 @@ const verifySkill = async (req, res) => {
   }
 };
 
+/**
+ * Get applications count summary for the authenticated student
+ * - returns counts for applied, shortlisted, rejected, hired
+ */
+const getApplicationCounts = async (req, res) => {
+  try {
+    // Use internal _id if middleware set it, else resolve via firebase uid
+    let studentId = req.user?._id || null;
+    if (!studentId) {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+      const student = await Student.findOne({ firebaseId: uid }).select("_id");
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      studentId = student._id;
+    }
+
+    const [applied, shortlisted, rejected, hired, total] = await Promise.all([
+      Application.countDocuments({ candidate: studentId, status: "applied" }),
+      Application.countDocuments({ candidate: studentId, status: "shortlisted" }),
+      Application.countDocuments({ candidate: studentId, status: "rejected" }),
+      Application.countDocuments({ candidate: studentId, status: "hired" }),
+      Application.countDocuments({ candidate: studentId }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: { total, applied, shortlisted, rejected, hired },
+    });
+  } catch (error) {
+    console.error("Error getting application counts:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * Get count of applications with status=applied for the authenticated student
+ */
+const getAppliedApplicationsCount = async (req, res) => {
+  try {
+    let studentId = req.user?._id || null;
+    if (!studentId) {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+      const student = await Student.findOne({ firebaseId: uid }).select("_id");
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      studentId = student._id;
+    }
+
+    const count = await Application.countDocuments({ candidate: studentId, status: "applied" });
+    return res.status(200).json({ success: true, count });
+  } catch (error) {
+    console.error("Error getting applied applications count:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * Get count of applications with status=shortlisted for the authenticated student
+ */
+const getShortlistedApplicationsCount = async (req, res) => {
+  try {
+    let studentId = req.user?._id || null;
+    if (!studentId) {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+      const student = await Student.findOne({ firebaseId: uid }).select("_id");
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      studentId = student._id;
+    }
+
+    const count = await Application.countDocuments({ candidate: studentId, status: "shortlisted" });
+    return res.status(200).json({ success: true, count });
+  } catch (error) {
+    console.error("Error getting shortlisted applications count:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * Get applications list for the authenticated student with optional filters
+ * Query params:
+ * - status: applied | shortlisted | rejected | hired (optional)
+ * - page: number (default 1)
+ * - limit: number (default 20)
+ * - sort: default -createdAt
+ */
+const getApplications = async (req, res) => {
+  try {
+    // Resolve student id
+    let studentId = req.user?._id || null;
+    if (!studentId) {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+      const student = await Student.findOne({ firebaseId: uid }).select("_id");
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      studentId = student._id;
+    }
+
+    const { status, page = "1", limit = "20", sort = "-createdAt" } = req.query;
+
+    const filter = { candidate: studentId };
+    if (status && ["applied", "shortlisted", "rejected", "hired"].includes(status)) {
+      filter.status = status;
+    }
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [applications, total] = await Promise.all([
+      Application.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum)
+        .populate({
+          path: "job",
+          select: "title preferences location createdAt recruiter",
+          populate: {
+            path: "recruiter",
+            select: "name email designation companyId",
+            populate: {
+              path: "companyId",
+              model: "Company",
+              select: "name industry location logo",
+            },
+          },
+        })
+        .lean(),
+      Application.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: applications,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Error getting applications:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * Analytics for the authenticated student
+ * - totals by status
+ * - monthly trend (last 6 months) grouped by status
+ * - conversion rates
+ * - recent applications
+ */
+const getStudentAnalytics = async (req, res) => {
+  try {
+    // Resolve student id
+    let studentId = req.user?._id || null;
+    if (!studentId) {
+      const uid = req.user?.uid;
+      if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+      const student = await Student.findOne({ firebaseId: uid }).select("_id");
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      studentId = student._id;
+    }
+
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    // Totals by status and overall
+    const [total, applied, shortlisted, rejected, hired] = await Promise.all([
+      Application.countDocuments({ candidate: studentId }),
+      Application.countDocuments({ candidate: studentId, status: "applied" }),
+      Application.countDocuments({ candidate: studentId, status: "shortlisted" }),
+      Application.countDocuments({ candidate: studentId, status: "rejected" }),
+      Application.countDocuments({ candidate: studentId, status: "hired" }),
+    ]);
+
+    // Monthly trend for last 6 months
+    const trendRaw = await Application.aggregate([
+      { $match: { candidate: studentId, createdAt: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            status: "$status",
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]);
+
+    // Normalize trend into a map of months
+    const formatMonthKey = (y, m) => `${y}-${String(m).padStart(2, "0")}`;
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(formatMonthKey(d.getFullYear(), d.getMonth() + 1));
+    }
+    const statuses = ["applied", "shortlisted", "rejected", "hired"];
+    const trend = months.map((monthKey) => {
+      const entry = { month: monthKey };
+      statuses.forEach((s) => (entry[s] = 0));
+      return entry;
+    });
+    trendRaw.forEach((row) => {
+      const key = formatMonthKey(row._id.year, row._id.month);
+      const target = trend.find((t) => t.month === key);
+      if (target) target[row._id.status] = row.count;
+    });
+
+    const conversion = {
+      shortlistRate: applied > 0 ? Number(((shortlisted / applied) * 100).toFixed(2)) : 0,
+      hireRate: applied > 0 ? Number(((hired / applied) * 100).toFixed(2)) : 0,
+      rejectionRate: applied > 0 ? Number(((rejected / applied) * 100).toFixed(2)) : 0,
+    };
+
+    const recentApplications = await Application.find({ candidate: studentId })
+      .sort("-createdAt")
+      .limit(10)
+      .populate({
+        path: "job",
+        select: "title preferences location createdAt recruiter",
+        populate: {
+          path: "recruiter",
+          select: "name email designation companyId",
+          populate: {
+            path: "companyId",
+            model: "Company",
+            select: "name industry location logo",
+          },
+        },
+      })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totals: { total, applied, shortlisted, rejected, hired },
+        conversion,
+        trend,
+        recentApplications,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting student analytics:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 export {
   signup,
   checkUser,
@@ -597,5 +957,24 @@ export {
   getStudentDetails,
   addSkill,
   verifySkill,
-  // getStudentAnalytic
+
+  fetchsaves,
+  fetchAppliedJobs,
+
+
+  fetchsaves,
+  fetchAppliedJobs
+,
+
+  getApplicationCounts,
+  getAppliedApplicationsCount,
+  getShortlistedApplicationsCount,
+  getApplications,
+
+  getStudentAnalytics,
+
+
+
+  getStudentAnalytics
+
 };

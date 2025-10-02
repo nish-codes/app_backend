@@ -2,7 +2,32 @@ import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
+<<<<<<< HEAD
 import { signup, checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile, uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
+=======
+import {   signup,
+    checkUser,
+    login,
+    getJobs,
+    getHackathons,
+    applyToJob,
+    updateStudentProfile,
+    uploadProfilePhoto,
+    getStudentDetails,
+    addSkill,
+    verifySkill,
+  
+    fetchsaves,
+    fetchAppliedJobs,
+  
+    getApplicationCounts,
+    getAppliedApplicationsCount,
+    getShortlistedApplicationsCount,
+    getApplications,
+    getStudentAnalytics,
+   } from "../controllers/student.controller.js";
+
+>>>>>>> 2000c60e24acce0156a5661b0cea3e72e9f0b0f3
 
 const router = Router();
 
@@ -29,8 +54,22 @@ router.post('/StudentDetails', verifyFirebaseToken, getStudentDetails)
 router.get("/jobs", verifyFirebaseToken, getJobs);
 router.get("/hackathons", verifyFirebaseToken, getHackathons);
 
+// Application counts
+router.get("/applications/counts", verifyFirebaseToken, getApplicationCounts);
+router.get("/applications/counts/applied", verifyFirebaseToken, getAppliedApplicationsCount);
+router.get("/applications/counts/shortlisted", verifyFirebaseToken, getShortlistedApplicationsCount);
+
+// Applications list
+router.get("/applications", verifyFirebaseToken, getApplications);
+
+// Analytics
+router.get("/analytics", verifyFirebaseToken, getStudentAnalytics);
+
 // Action routes
-router.post("/jobs/:jobId/apply", verifyFirebaseToken, applyToJob);
+router.post("/jobs/:jobId/:jobtype/apply", verifyFirebaseToken, applyToJob);
 router.put("/profile", verifyFirebaseToken, updateStudentProfile);
 
+
+router.get('/saves',verifyFirebaseToken,fetchsaves)
+router.get('/fetchappliedjobs',verifyFirebaseToken,fetchAppliedJobs)
 export default router;

@@ -2,6 +2,7 @@ import { Application } from "../models/application.model.js";
 import  Job  from "../models/job.model.js";
 import { Recruiter } from "../models/recruiter.model.js"; 
 import { Student } from "../models/student.model.js";
+import { Company } from "../models/company.model.js";
 
 // Recruiter Signup
 const recruiterSignup = async (req, res) => {
@@ -14,6 +15,12 @@ const recruiterSignup = async (req, res) => {
       return res.status(400).json({ message: "Recruiter already exists" });
     }
 
+    // Validate company exists
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
     const newRecruiter = await Recruiter.create({
       firebaseId: uid,
       email,
@@ -23,9 +30,22 @@ const recruiterSignup = async (req, res) => {
       companyId,
     });
 
+    // Add recruiter to company's recruiters array
+    await Company.findByIdAndUpdate(
+      companyId,
+      { $push: { recruiters: newRecruiter._id } }
+    );
+
+    // Populate company information in response
+    const recruiterWithCompany = await Recruiter.findById(newRecruiter._id)
+      .populate("companyId", "name industry location logo");
+
     return res
       .status(201)
-      .json({ message: "Recruiter created successfully", user: newRecruiter });
+      .json({ 
+        message: "Recruiter created successfully", 
+        user: recruiterWithCompany 
+      });
   } catch (error) {
     console.error("Error during recruiter signup:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -37,7 +57,8 @@ const recruiterLogin = async (req, res) => {
   const { uid } = req.user;
 
   try {
-    const recruiter = await Recruiter.findOne({ firebaseId: uid });
+    const recruiter = await Recruiter.findOne({ firebaseId: uid })
+      .populate("companyId", "name industry location logo");
     if (!recruiter) {
       return res.status(404).json({ message: "Recruiter not found" });
     }
@@ -52,44 +73,108 @@ const recruiterLogin = async (req, res) => {
 // Post Job
 const postJob = async (req, res) => {
   try {
-    const recruiterId = req.user._id;
+    const { 
+      title, 
+      description, 
+      salaryRange, 
+      recruiter,   // directly from body
+      company,     // directly from body
+      preferences, 
+      jobType, 
+      college, 
+      applicationLink 
+    } = req.body;
 
-    const { title, description, salaryRange, preferences } = req.body;
-
+    // Validate required fields
     if (!title || !description || !salaryRange?.min || !salaryRange?.max) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be filled" });
+      return res.status(400).json({ 
+        message: "Title, description, and salary range are required" 
+      });
     }
 
-    const newJob = await Job.create({
-      title,
-      description,
-      recruiter: recruiterId,
-      salaryRange,
-      preferences,
-    });
+    // Validate jobType
+    if (!jobType || !["company", "on-campus", "external"].includes(jobType)) {
+      return res.status(400).json({ 
+        message: "Valid jobType is required (company, on-campus, or external)" 
+      });
+    }
 
-    // Update recruiter stats
-    await Recruiter.findByIdAndUpdate(recruiterId, {
-      $inc: { "activityEngagement.jobsPosted": 1 },
-      $push: { "activityEngagement.activeJobs": newJob._id },
-    });
+    let jobData = { 
+      title, 
+      description, 
+      salaryRange, 
+      preferences: preferences || {}, 
+      jobType 
+    };
+
+    if (jobType === "on-campus") {
+      if (!college || !applicationLink) {
+        return res.status(400).json({ 
+          message: "College and application link are required for on-campus jobs" 
+        });
+      }
+      jobData.college = college;
+      jobData.applicationLink = applicationLink;
+    } else {
+      if (!recruiter || !company) {
+        return res.status(400).json({ 
+          message: "Recruiter and company are required for company/external jobs" 
+        });
+      }
+      jobData.recruiter = recruiter;
+      jobData.company = company;
+    }
+
+    // Create job
+    const newJob = await Job.create(jobData);
+
+    // Update recruiter + company stats only for company/external jobs
+    if (jobType !== "on-campus") {
+      await Recruiter.findByIdAndUpdate(recruiter, {
+        $inc: { "activityEngagement.jobsPosted": 1 },
+        $push: { "activityEngagement.activeJobs": newJob._id },
+      });
+
+      await Company.findByIdAndUpdate(company, {
+        $push: { jobs: newJob._id }
+      });
+    }
+
+    // Populate recruiter & company for company/external
+    let populatedJob;
+    if (jobType === "on-campus") {
+      populatedJob = await Job.findById(newJob._id);
+    } else {
+      populatedJob = await Job.findById(newJob._id)
+        .populate("recruiter", "name email designation")
+        .populate("company", "name industry location logo");
+    }
 
     return res.status(201).json({
       success: true,
       message: "Job posted successfully",
-      job: newJob,
+      job: populatedJob,
     });
+
   } catch (error) {
     console.error("Error posting job:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error, could not post job",
-      error: error.message,
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: "Validation failed", 
+        errors 
+      });
+    }
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
     });
   }
 };
+
+
 
 // Get Applications for a Job
 // const getApplications = async (req, res) => {
@@ -192,7 +277,10 @@ const companyJobs = await Job.find({
       new RegExp(`^${escapeRegex(skill)}$`, "i")
     ),
   },
-}).sort({ createdAt: -1 });
+})
+.populate("recruiter", "name email designation")
+.populate("company", "name industry location logo")
+.sort({ createdAt: -1 });
 
       console.log("💼 Skills-based jobs found:", companyJobs.length);
 
@@ -228,6 +316,8 @@ const companyJobs = await Job.find({
       console.log("📋 Fetching general company jobs...");
       
       const generalJobs = await Job.find({ jobType: "company" })
+        .populate("recruiter", "name email designation")
+        .populate("company", "name industry location logo")
         .sort({ createdAt: -1 })
         .limit(10);
 
