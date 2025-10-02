@@ -957,15 +957,15 @@ export {
   getStudentDetails,
   addSkill,
   verifySkill,
-<<<<<<< HEAD
+
   fetchsaves,
-  fetchAppliedJobs
-=======
+  fetchAppliedJobs,
+
   getApplicationCounts,
   getAppliedApplicationsCount,
   getShortlistedApplicationsCount,
   getApplications,
   getStudentAnalytics,
->>>>>>> 7ea7f53039015b64c5708fdfd1ddd53ee2a12128
-  // getStudentAnalytic
+
+
 };
