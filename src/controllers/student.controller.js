@@ -328,12 +328,7 @@ const getJobs = async (req, res) => {
         .limit(limitNum)
         .populate({
           path: "recruiter",
-          select: "name email designation companyId",
-          populate: {
-            path: "companyId",
-            model: "Company",
-            select: "name industry location logo",
-          },
+          select: "name email designation company",
         })
         .lean(),
       Job.countDocuments(filter),
@@ -812,12 +807,7 @@ const getApplications = async (req, res) => {
           select: "title preferences location createdAt recruiter",
           populate: {
             path: "recruiter",
-            select: "name email designation companyId",
-            populate: {
-              path: "companyId",
-              model: "Company",
-              select: "name industry location logo",
-            },
+            select: "name email designation company",
           },
         })
         .lean(),
@@ -915,19 +905,14 @@ const getStudentAnalytics = async (req, res) => {
     const recentApplications = await Application.find({ candidate: studentId })
       .sort("-createdAt")
       .limit(10)
-      .populate({
-        path: "job",
-        select: "title preferences location createdAt recruiter",
-        populate: {
-          path: "recruiter",
-          select: "name email designation companyId",
+        .populate({
+          path: "job",
+          select: "title preferences location createdAt recruiter",
           populate: {
-            path: "companyId",
-            model: "Company",
-            select: "name industry location logo",
+            path: "recruiter",
+            select: "name email designation company",
           },
-        },
-      })
+        })
       .lean();
 
     return res.status(200).json({

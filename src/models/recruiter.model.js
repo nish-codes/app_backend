@@ -31,11 +31,47 @@ const recruiterSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    //reference to compnay model
-    companyId:{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Company',
-        required: true
+    // Embedded company details instead of reference
+    company: {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        description: {
+            type: String,
+            trim: true,
+        },
+        industry: {
+            type: String,
+            trim: true,
+        },
+        website: {
+            type: String,
+            trim: true,
+        },
+        location: {
+            address: String,
+            city: String,
+            state: String,
+            country: String,
+            zipcode: String,
+        },
+        size: {
+            type: String,
+            enum: ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"],
+        },
+        companyType: {
+            type: String,
+            enum: ["Startup", "MNC", "SME", "Government", "Non-Profit"],
+            default: "Startup",
+        },
+        founded: {
+            type: Number, // year of establishment
+        },
+        logo: {
+            type: String, // Cloudinary or S3 URL
+        },
     },
     isVerfied:{
         type: Boolean,

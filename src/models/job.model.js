@@ -18,14 +18,6 @@ const jobSchema = new mongoose.Schema(
       required: false
     },
     
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: function () {
-        return this.jobType !== "on-campus";
-      },
-    },
-    
     college: {
       type: String,
       required: function () {

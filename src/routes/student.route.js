@@ -27,7 +27,6 @@ import {   signup,
     getStudentAnalytics,
    } from "../controllers/student.controller.js";
 
->>>>>>> 2000c60e24acce0156a5661b0cea3e72e9f0b0f3
 
 const router = Router();
 
@@ -49,7 +48,7 @@ router.post(
 router.post('/verifySkills', verifyFirebaseToken, verifySkill)
 router.post('/addSkills', verifyFirebaseToken, addSkill)
 // ✅ Data fetching routes  
-router.post('/StudentDetails', verifyFirebaseToken, getStudentDetails)
+router.get('/StudentDetails', verifyFirebaseToken, getStudentDetails)
 // Data fetching routes  
 router.get("/jobs", verifyFirebaseToken, getJobs);
 router.get("/hackathons", verifyFirebaseToken, getHackathons);

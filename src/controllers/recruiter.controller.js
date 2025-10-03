@@ -2,12 +2,16 @@ import { Application } from "../models/application.model.js";
 import  Job  from "../models/job.model.js";
 import { Recruiter } from "../models/recruiter.model.js"; 
 import { Student } from "../models/student.model.js";
-import { Company } from "../models/company.model.js";
 
 // Recruiter Signup
 const recruiterSignup = async (req, res) => {
   const { uid, email } = req.user;
-  const { name, phone, designation, companyId } = req.body;
+  const { 
+    name, 
+    phone, 
+    designation, 
+    company 
+  } = req.body;
 
   try {
     const existingRecruiter = await Recruiter.findOne({ firebaseId: uid });
@@ -15,10 +19,9 @@ const recruiterSignup = async (req, res) => {
       return res.status(400).json({ message: "Recruiter already exists" });
     }
 
-    // Validate company exists
-    const company = await Company.findById(companyId);
-    if (!company) {
-      return res.status(404).json({ message: "Company not found" });
+    // Validate company details are provided
+    if (!company || !company.name) {
+      return res.status(400).json({ message: "Company details are required" });
     }
 
     const newRecruiter = await Recruiter.create({
@@ -27,24 +30,24 @@ const recruiterSignup = async (req, res) => {
       name,
       phone,
       designation,
-      companyId,
+      company: {
+        name: company.name,
+        description: company.description || "",
+        industry: company.industry || "",
+        website: company.website || "",
+        location: company.location || {},
+        size: company.size || "",
+        companyType: company.companyType || "Startup",
+        founded: company.founded || null,
+        logo: company.logo || "",
+      },
     });
-
-    // Add recruiter to company's recruiters array
-    await Company.findByIdAndUpdate(
-      companyId,
-      { $push: { recruiters: newRecruiter._id } }
-    );
-
-    // Populate company information in response
-    const recruiterWithCompany = await Recruiter.findById(newRecruiter._id)
-      .populate("companyId", "name industry location logo");
 
     return res
       .status(201)
       .json({ 
         message: "Recruiter created successfully", 
-        user: recruiterWithCompany 
+        user: newRecruiter 
       });
   } catch (error) {
     console.error("Error during recruiter signup:", error);
@@ -57,8 +60,7 @@ const recruiterLogin = async (req, res) => {
   const { uid } = req.user;
 
   try {
-    const recruiter = await Recruiter.findOne({ firebaseId: uid })
-      .populate("companyId", "name industry location logo");
+    const recruiter = await Recruiter.findOne({ firebaseId: uid });
     if (!recruiter) {
       return res.status(404).json({ message: "Recruiter not found" });
     }
@@ -78,7 +80,6 @@ const postJob = async (req, res) => {
       description, 
       salaryRange, 
       recruiter,   // directly from body
-      company,     // directly from body
       preferences, 
       jobType, 
       college, 
@@ -116,38 +117,32 @@ const postJob = async (req, res) => {
       jobData.college = college;
       jobData.applicationLink = applicationLink;
     } else {
-      if (!recruiter || !company) {
+      if (!recruiter) {
         return res.status(400).json({ 
-          message: "Recruiter and company are required for company/external jobs" 
+          message: "Recruiter is required for company/external jobs" 
         });
       }
       jobData.recruiter = recruiter;
-      jobData.company = company;
     }
 
     // Create job
     const newJob = await Job.create(jobData);
 
-    // Update recruiter + company stats only for company/external jobs
+    // Update recruiter stats only for company/external jobs
     if (jobType !== "on-campus") {
       await Recruiter.findByIdAndUpdate(recruiter, {
         $inc: { "activityEngagement.jobsPosted": 1 },
         $push: { "activityEngagement.activeJobs": newJob._id },
       });
-
-      await Company.findByIdAndUpdate(company, {
-        $push: { jobs: newJob._id }
-      });
     }
 
-    // Populate recruiter & company for company/external
+    // Populate recruiter for company/external jobs
     let populatedJob;
     if (jobType === "on-campus") {
       populatedJob = await Job.findById(newJob._id);
     } else {
       populatedJob = await Job.findById(newJob._id)
-        .populate("recruiter", "name email designation")
-        .populate("company", "name industry location logo");
+        .populate("recruiter", "name email designation company");
     }
 
     return res.status(201).json({
@@ -278,8 +273,7 @@ const companyJobs = await Job.find({
     ),
   },
 })
-.populate("recruiter", "name email designation")
-.populate("company", "name industry location logo")
+.populate("recruiter", "name email designation company")
 .sort({ createdAt: -1 });
 
       console.log("💼 Skills-based jobs found:", companyJobs.length);
@@ -316,8 +310,7 @@ const companyJobs = await Job.find({
       console.log("📋 Fetching general company jobs...");
       
       const generalJobs = await Job.find({ jobType: "company" })
-        .populate("recruiter", "name email designation")
-        .populate("company", "name industry location logo")
+        .populate("recruiter", "name email designation company")
         .sort({ createdAt: -1 })
         .limit(10);
 
@@ -405,7 +398,7 @@ const updateRecruiterProfile = async (req, res) => {
       "phone",
       "profilePicture",
       "designation",
-      "companyId",
+      "company",
     ];
 
     // Extract only allowed fields from req.body
@@ -421,7 +414,7 @@ const updateRecruiterProfile = async (req, res) => {
       recruiterId,
       { $set: updates },
       { new: true, runValidators: true }
-    ).populate("companyId", "name industry location logo");
+    );
 
     if (!updatedRecruiter) {
       return res.status(404).json({ message: "Recruiter not found" });
