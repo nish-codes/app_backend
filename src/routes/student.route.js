@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
 
-import { signup, checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile, uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
+
+
 import {   signup,
     checkUser,
     login,
@@ -23,6 +24,7 @@ import {   signup,
     getApplications,
     getStudentAnalytics,
    } from "../controllers/student.controller.js";
+
 
 
 const router = Router();

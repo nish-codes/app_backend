@@ -22,4 +22,5 @@ app.use("/college", collegeRoutes);
 
 app.use("/skills",questionRoute)
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+const PORT = process.env.PORT || 8080; // <- use 8080 for Cloud Run
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
