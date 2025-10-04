@@ -20,6 +20,8 @@ const createHackathon = async (req, res) => {
             registrationDeadline,
             prizePool,
             eligibility,
+            organizedBy,
+            mode,
             website
         });
         

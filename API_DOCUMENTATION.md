@@ -65,18 +65,81 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Response (Success):**
 ```json
 {
   "message": "Student created successfully",
   "user": {
-    "_id": "student_id",
-    "firebaseId": "firebase_uid",
+    "_id": "64f8a1b2c3d4e5f6a7b8c9d0",
+    "firebaseId": "firebase_uid_12345",
+    "email": "john@example.com",
+    "phone": "1234567890",
+    "profile": {
+      "FullName": "John Doe",
+      "profilePicture": "https://cloudinary.com/profile.jpg",
+      "bio": "Passionate software developer with 2 years of experience...",
+      "about": "I am a dedicated computer science student with a strong interest in web development..."
+    },
+    "education": {
+      "college": "University of Technology",
+      "universityType": "public",
+      "degree": "Bachelor of Technology",
+      "collegeEmail": "john@university.edu",
+      "yearOfPassing": 2024
+    },
+    "user_skills": {
+      "JavaScript": { "level": "unverified" },
+      "React": { "level": "beginner" },
+      "Node.js": { "level": "unverified" }
+    },
+    "job_preference": ["Software Development", "Web Development"],
+    "experience": [
+      {
+        "nameOfOrg": "Tech Internship Co.",
+        "position": "Frontend Developer Intern",
+        "timeline": "Summer 2023",
+        "description": "Worked on React applications..."
+      }
+    ],
+    "projects": [
+      {
+        "projectName": "E-commerce Website",
+        "link": "https://github.com/john/ecommerce",
+        "description": "Full-stack e-commerce application built with React and Node.js"
+      }
+    ],
+    "saves": [],
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  },
+  "exists": true
+}
+```
+
+**Response (Error - User Already Exists):**
+```json
+{
+  "message": "User already exists",
+  "user": {
+    "_id": "64f8a1b2c3d4e5f6a7b8c9d0",
+    "firebaseId": "firebase_uid_12345",
     "email": "john@example.com",
     "profile": { ... },
     "education": { ... },
     "user_skills": { ... }
   }
+}
+```
+
+**Response (Error - Validation Failed):**
+```json
+{
+  "message": "Validation failed",
+  "errors": {
+    "profile.FullName": "FullName is required",
+    "email": "Email must be a valid email address"
+  },
+  "details": "ValidationError: profile.FullName: FullName is required"
 }
 ```
 
@@ -135,13 +198,29 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Response (Success):**
 ```json
 {
   "message": "Skill added successfully",
   "skills": {
-    "JavaScript": { "level": "unverified" }
+    "JavaScript": { "level": "unverified" },
+    "React": { "level": "beginner" },
+    "Node.js": { "level": "unverified" }
   }
+}
+```
+
+**Response (Error - Skill Already Exists):**
+```json
+{
+  "message": "Skill already exists"
+}
+```
+
+**Response (Error - Missing Skill Name):**
+```json
+{
+  "message": "Skill name is required"
 }
 ```
 
@@ -164,13 +243,36 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Response (Success):**
 ```json
 {
   "message": "Skill level updated successfully through manual verification",
   "skills": {
-    "JavaScript": { "level": "beginner" }
+    "JavaScript": { "level": "beginner" },
+    "React": { "level": "unverified" },
+    "Node.js": { "level": "mid" }
   }
+}
+```
+
+**Response (Error - Skill Already Verified):**
+```json
+{
+  "message": "Skill is already verified. Take a quiz to improve your level or reset the skill to unverified first."
+}
+```
+
+**Response (Error - Invalid Level):**
+```json
+{
+  "message": "Invalid skill level"
+}
+```
+
+**Response (Error - Skill Not Found):**
+```json
+{
+  "message": "Skill does not exist. Add it first."
 }
 ```
 
@@ -194,13 +296,22 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Response (Success):**
 ```json
 {
   "message": "Skill reset to unverified successfully. You can now retake the quiz.",
   "skills": {
-    "JavaScript": { "level": "unverified" }
+    "JavaScript": { "level": "unverified" },
+    "React": { "level": "beginner" },
+    "Node.js": { "level": "mid" }
   }
+}
+```
+
+**Response (Error - Skill Not Found):**
+```json
+{
+  "message": "Skill does not exist. Add it first."
 }
 ```
 
@@ -1047,7 +1158,7 @@ Authorization: Bearer <firebase_token>
 
 **Example:** `GET /skills/questions?lvl=Beginner&skill=JavaScript`
 
-**Response:**
+**Response (Success):**
 ```json
 [
   {
@@ -1063,8 +1174,22 @@ Authorization: Bearer <firebase_token>
     "2": "add()",
     "3": "insert()",
     "4": "append()"
+  },
+  {
+    "Question": "What does the 'this' keyword refer to in JavaScript?",
+    "1": "The current function",
+    "2": "The current object",
+    "3": "The global object",
+    "4": "The parent object"
   }
 ]
+```
+
+**Response (Error - No Questions Found):**
+```json
+{
+  "message": "No matching skill found"
+}
 ```
 
 ### 2. Get Skills
@@ -1072,7 +1197,7 @@ Authorization: Bearer <firebase_token>
 
 **Description:** Get list of available skills
 
-**Response:**
+**Response (Success):**
 ```json
 [
   "JavaScript",
@@ -1084,7 +1209,20 @@ Authorization: Bearer <firebase_token>
   "HTML",
   "CSS",
   "MongoDB",
-  "Express.js"
+  "Express.js",
+  "TypeScript",
+  "Vue.js",
+  "Angular",
+  "Django",
+  "Flask",
+  "Spring Boot",
+  "MySQL",
+  "PostgreSQL",
+  "Redis",
+  "Docker",
+  "Kubernetes",
+  "AWS",
+  "Git"
 ]
 ```
 
@@ -1093,7 +1231,7 @@ Authorization: Bearer <firebase_token>
 
 **Description:** Get job preference options
 
-**Response:**
+**Response (Success):**
 ```json
 [
   "Software Development",
@@ -1103,7 +1241,16 @@ Authorization: Bearer <firebase_token>
   "DevOps",
   "UI/UX Design",
   "Product Management",
-  "Quality Assurance"
+  "Quality Assurance",
+  "Machine Learning",
+  "Artificial Intelligence",
+  "Cloud Computing",
+  "Cybersecurity",
+  "Blockchain",
+  "Game Development",
+  "Full Stack Development",
+  "Frontend Development",
+  "Backend Development"
 ]
 ```
 
@@ -1134,7 +1281,7 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Response (Success - High Score):**
 ```json
 {
   "success": true,
@@ -1148,6 +1295,64 @@ Content-Type: application/json
     "newLevel": "beginner",
     "skillUpdated": true
   }
+}
+```
+
+**Response (Success - Medium Score):**
+```json
+{
+  "success": true,
+  "message": "Quiz submitted successfully",
+  "data": {
+    "skillName": "React",
+    "difficulty": "Intermediate",
+    "score": 6,
+    "totalQuestions": 10,
+    "percentageScore": 60,
+    "newLevel": "beginner",
+    "skillUpdated": true
+  }
+}
+```
+
+**Response (Success - Low Score):**
+```json
+{
+  "success": true,
+  "message": "Quiz submitted successfully",
+  "data": {
+    "skillName": "Node.js",
+    "difficulty": "Advanced",
+    "score": 4,
+    "totalQuestions": 10,
+    "percentageScore": 40,
+    "newLevel": "unverified",
+    "skillUpdated": false
+  }
+}
+```
+
+**Response (Error - Missing Fields):**
+```json
+{
+  "success": false,
+  "message": "Missing required fields: skillName, difficulty, score, totalQuestions"
+}
+```
+
+**Response (Error - Skill Not Found):**
+```json
+{
+  "success": false,
+  "message": "Skill does not exist. Add the skill first before taking the quiz."
+}
+```
+
+**Response (Error - Student Not Found):**
+```json
+{
+  "success": false,
+  "message": "Student not found"
 }
 ```
 
@@ -1191,6 +1396,82 @@ Content-Type: application/json
 }
 ```
 
+**Response (Success - Single Job):**
+```json
+{
+  "success": true,
+  "message": "Job posted successfully",
+  "job": {
+    "_id": "64f8a1b2c3d4e5f6a7b8c9d0",
+    "title": "Software Engineer",
+    "description": "Job description...",
+    "rolesAndResponsibilities": "Develop and maintain web applications...",
+    "perks": "Health insurance, flexible hours, remote work...",
+    "details": "Additional job details and requirements...",
+    "jobType": "company",
+    "employmentType": "full-time",
+    "noOfOpenings": 3,
+    "duration": "6 months",
+    "mode": "hybrid",
+    "stipend": 5000,
+    "recruiter": {
+      "_id": "64f8a1b2c3d4e5f6a7b8c9d1",
+      "name": "John Smith",
+      "email": "john@company.com",
+      "designation": "HR Manager",
+      "company": {
+        "name": "Tech Corp",
+        "description": "Leading technology company",
+        "industry": "Technology",
+        "website": "https://techcorp.com",
+        "location": {
+          "city": "San Francisco",
+          "state": "California",
+          "country": "USA"
+        },
+        "size": "201-500",
+        "companyType": "MNC",
+        "founded": 2010,
+        "logo": "https://cloudinary.com/logo.png"
+      }
+    },
+    "salaryRange": { "min": 50000, "max": 80000 },
+    "preferences": {
+      "skills": ["JavaScript", "React", "Node.js"],
+      "minExperience": 1,
+      "education": "Bachelor's Degree",
+      "location": "Remote"
+    },
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Response (Error - Missing Required Fields):**
+```json
+{
+  "success": false,
+  "message": "Title, description, and salary range are required"
+}
+```
+
+**Response (Error - Invalid Employment Type):**
+```json
+{
+  "success": false,
+  "message": "Valid employmentType is required (full-time, part-time, contract, internship, freelance)"
+}
+```
+
+**Response (Error - Invalid Mode):**
+```json
+{
+  "success": false,
+  "message": "Valid mode is required (remote, on-site, hybrid)"
+}
+```
+
 **New Job Fields:**
 - `rolesAndResponsibilities`: Detailed role description
 - `perks`: Benefits and perks offered
@@ -1226,20 +1507,103 @@ Content-Type: application/json
 
 **Description:** Get all jobs
 
-**Response:**
+**Response (Success):**
 ```json
 [
   {
-    "_id": "job_id",
+    "_id": "64f8a1b2c3d4e5f6a7b8c9d0",
     "title": "Software Engineer",
-    "description": "...",
-    "recruiter": "recruiter_id",
-    "company": "company_id",
+    "description": "We are looking for a skilled software engineer...",
+    "rolesAndResponsibilities": "Develop and maintain web applications using modern technologies...",
+    "perks": "Health insurance, flexible hours, remote work options...",
+    "details": "Must have 2+ years experience in full-stack development...",
+    "jobType": "company",
+    "employmentType": "full-time",
+    "noOfOpenings": 3,
+    "duration": "6 months",
+    "mode": "hybrid",
+    "stipend": 5000,
+    "recruiter": {
+      "_id": "64f8a1b2c3d4e5f6a7b8c9d1",
+      "name": "John Smith",
+      "email": "john@company.com",
+      "designation": "HR Manager",
+      "company": {
+        "name": "Tech Corp",
+        "description": "Leading technology company",
+        "industry": "Technology",
+        "website": "https://techcorp.com",
+        "location": {
+          "city": "San Francisco",
+          "state": "California",
+          "country": "USA"
+        },
+        "size": "201-500",
+        "companyType": "MNC",
+        "founded": 2010,
+        "logo": "https://cloudinary.com/logo.png"
+      }
+    },
     "salaryRange": { "min": 50000, "max": 80000 },
-    "preferences": { ... },
-    "createdAt": "2024-01-15T10:30:00Z"
+    "preferences": {
+      "skills": ["JavaScript", "React", "Node.js"],
+      "minExperience": 1,
+      "education": "Bachelor's Degree",
+      "location": "Remote"
+    },
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  },
+  {
+    "_id": "64f8a1b2c3d4e5f6a7b8c9d2",
+    "title": "Frontend Developer",
+    "description": "Join our frontend team...",
+    "rolesAndResponsibilities": "Build responsive user interfaces...",
+    "perks": "Competitive salary, learning opportunities...",
+    "details": "Experience with React and TypeScript required...",
+    "jobType": "company",
+    "employmentType": "full-time",
+    "noOfOpenings": 2,
+    "mode": "remote",
+    "recruiter": {
+      "_id": "64f8a1b2c3d4e5f6a7b8c9d3",
+      "name": "Sarah Johnson",
+      "email": "sarah@startup.com",
+      "designation": "Tech Lead",
+      "company": {
+        "name": "StartupXYZ",
+        "description": "Innovative startup company",
+        "industry": "Technology",
+        "website": "https://startupxyz.com",
+        "location": {
+          "city": "New York",
+          "state": "New York",
+          "country": "USA"
+        },
+        "size": "11-50",
+        "companyType": "Startup",
+        "founded": 2020,
+        "logo": "https://cloudinary.com/startup-logo.png"
+      }
+    },
+    "salaryRange": { "min": 60000, "max": 90000 },
+    "preferences": {
+      "skills": ["React", "TypeScript", "CSS"],
+      "minExperience": 2,
+      "education": "Bachelor's Degree",
+      "location": "Remote"
+    },
+    "createdAt": "2024-01-14T14:20:00.000Z",
+    "updatedAt": "2024-01-14T14:20:00.000Z"
   }
 ]
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Database connection failed"
+}
 ```
 
 ---
