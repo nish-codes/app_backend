@@ -44,6 +44,8 @@ Content-Type: application/json
     "FullName": "John Doe",
     "firstName": "John",
     "lastName": "Doe",
+    "bio": "Passionate software developer with 2 years of experience...",
+    "about": "I am a dedicated computer science student with a strong interest in web development...",
     "dateOfBirth": "2000-01-01",
     "phone": "1234567890",
     "address": "123 Main St"
@@ -56,9 +58,9 @@ Content-Type: application/json
     "cgpa": 8.5
   },
   "user_skills": {
-    "JavaScript": "intermediate",
+    "JavaScript": "mid",
     "React": "beginner",
-    "Node.js": "advanced"
+    "Node.js": "advance"
   }
 }
 ```
@@ -115,10 +117,10 @@ Authorization: Bearer <firebase_token>
 }
 ```
 
-### 5. Verify Skills
-**POST** `/student/verifySkills`
+### 5. Add Skills
+**POST** `/student/addSkills`
 
-**Description:** Verify student skills through assessment
+**Description:** Add a skill to student profile (starts as unverified)
 
 **Headers:**
 ```
@@ -129,30 +131,24 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "skills": ["JavaScript", "React", "Node.js"],
-  "answers": {
-    "JavaScript": ["answer1", "answer2", ...],
-    "React": ["answer1", "answer2", ...]
-  }
+  "skillName": "JavaScript"
 }
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "verifiedSkills": ["JavaScript", "React"],
-  "scores": {
-    "JavaScript": 85,
-    "React": 92
+  "message": "Skill added successfully",
+  "skills": {
+    "JavaScript": { "level": "unverified" }
   }
 }
 ```
 
-### 6. Add Skills
-**POST** `/student/addSkills`
+### 6. Verify Skills (Manual)
+**POST** `/student/verifySkills`
 
-**Description:** Add verified skills to student profile
+**Description:** Manually verify student skills (only works for unverified skills)
 
 **Headers:**
 ```
@@ -163,14 +159,58 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
+  "skillName": "JavaScript",
+  "level": "beginner"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Skill level updated successfully through manual verification",
   "skills": {
-    "JavaScript": "intermediate",
-    "React": "beginner"
+    "JavaScript": { "level": "beginner" }
   }
 }
 ```
 
-### 7. Get Student Details
+**Note:** Manual verification only works if the skill is currently "unverified". For quiz-based verification, use `/skills/submitQuiz`.
+
+### 7. Reset Skill
+**POST** `/student/resetSkill`
+
+**Description:** Reset a skill back to unverified (allows retaking quiz)
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "skillName": "JavaScript"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Skill reset to unverified successfully. You can now retake the quiz.",
+  "skills": {
+    "JavaScript": { "level": "unverified" }
+  }
+}
+```
+
+**Skill Levels:**
+- `unverified` (default when adding skills)
+- `beginner` (0.5 weight in job matching)
+- `mid` (1.0 weight in job matching)
+- `advance` (1.5 weight in job matching)
+
+### 8. Get Student Details
 **POST** `/student/StudentDetails`
 
 **Description:** Get detailed student information
@@ -1001,21 +1041,30 @@ Authorization: Bearer <firebase_token>
 
 **Description:** Get assessment questions for skills verification
 
+**Query Parameters:**
+- `lvl`: Difficulty level (`Beginner`, `Intermediate`, `Advanced`)
+- `skill`: Skill name (e.g., `JavaScript`, `React`, `Python`)
+
+**Example:** `GET /skills/questions?lvl=Beginner&skill=JavaScript`
+
 **Response:**
 ```json
-{
-  "success": true,
-  "questions": {
-    "JavaScript": [
-      {
-        "question": "What is the difference between let and var?",
-        "options": ["A", "B", "C", "D"],
-        "correctAnswer": "A"
-      }
-    ],
-    "React": [ ... ]
+[
+  {
+    "Question": "What is the difference between let and var?",
+    "1": "let has block scope, var has function scope",
+    "2": "var has block scope, let has function scope", 
+    "3": "Both have the same scope",
+    "4": "let is deprecated"
+  },
+  {
+    "Question": "Which method is used to add elements to an array?",
+    "1": "push()",
+    "2": "add()",
+    "3": "insert()",
+    "4": "append()"
   }
-}
+]
 ```
 
 ### 2. Get Skills
@@ -1025,17 +1074,18 @@ Authorization: Bearer <firebase_token>
 
 **Response:**
 ```json
-{
-  "success": true,
-  "skills": [
-    "JavaScript",
-    "React",
-    "Node.js",
-    "Python",
-    "Java",
-    "C++"
-  ]
-}
+[
+  "JavaScript",
+  "React",
+  "Node.js",
+  "Python",
+  "Java",
+  "C++",
+  "HTML",
+  "CSS",
+  "MongoDB",
+  "Express.js"
+]
 ```
 
 ### 3. Get Job Preferences
@@ -1045,16 +1095,66 @@ Authorization: Bearer <firebase_token>
 
 **Response:**
 ```json
+[
+  "Software Development",
+  "Data Science",
+  "Web Development",
+  "Mobile Development",
+  "DevOps",
+  "UI/UX Design",
+  "Product Management",
+  "Quality Assurance"
+]
+```
+
+### 4. Submit Quiz Results
+**POST** `/skills/submitQuiz`
+
+**Description:** Submit quiz results and automatically update skill level
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "skillName": "JavaScript",
+  "difficulty": "Beginner",
+  "score": 8,
+  "totalQuestions": 10,
+  "answers": [
+    {
+      "questionId": "1",
+      "selectedAnswer": "1"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
 {
   "success": true,
-  "preferences": {
-    "jobTypes": ["Full-time", "Part-time", "Internship", "Contract"],
-    "locations": ["Remote", "On-site", "Hybrid"],
-    "experienceLevels": ["Entry", "Mid", "Senior", "Lead"],
-    "industries": ["Technology", "Finance", "Healthcare", "Education"]
+  "message": "Quiz submitted successfully",
+  "data": {
+    "skillName": "JavaScript",
+    "difficulty": "Beginner",
+    "score": 8,
+    "totalQuestions": 10,
+    "percentageScore": 80,
+    "newLevel": "beginner",
+    "skillUpdated": true
   }
 }
 ```
+
+**Skill Level Assignment Logic:**
+- **Score ≥80%**: Can achieve the quiz difficulty level
+- **Score 60-79%**: Achieves beginner level (or current level if higher)
+- **Score <60%**: Remains unverified
 
 ---
 
@@ -1071,12 +1171,35 @@ Authorization: Bearer <firebase_token>
 {
   "title": "Software Engineer",
   "description": "Job description...",
+  "rolesAndResponsibilities": "Develop and maintain web applications...",
+  "perks": "Health insurance, flexible hours, remote work...",
+  "details": "Additional job details and requirements...",
+  "jobType": "company",
+  "employmentType": "full-time",
+  "noOfOpenings": 3,
+  "duration": "6 months",
+  "mode": "hybrid",
+  "stipend": 5000,
   "recruiter": "recruiter_id",
-  "company": "company_id",
   "salaryRange": { "min": 50000, "max": 80000 },
-  "preferences": { ... }
+  "preferences": {
+    "skills": ["JavaScript", "React", "Node.js"],
+    "minExperience": 1,
+    "education": "Bachelor's Degree",
+    "location": "Remote"
+  }
 }
 ```
+
+**New Job Fields:**
+- `rolesAndResponsibilities`: Detailed role description
+- `perks`: Benefits and perks offered
+- `details`: Additional job information
+- `employmentType`: `full-time`, `part-time`, `contract`, `internship`, `freelance`
+- `noOfOpenings`: Number of positions available
+- `duration`: Job duration (for contracts/internships)
+- `mode`: `remote`, `on-site`, `hybrid`
+- `stipend`: Stipend amount (for internships/part-time)
 
 **Request Body (Multiple Jobs):**
 ```json

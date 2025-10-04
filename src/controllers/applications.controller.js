@@ -1,7 +1,8 @@
 const skillWeights = {
+  unverified: 0,
   beginner: 0.5,
   mid: 1,
-  adv: 1.5
+  advance: 1.5
 };
 
 function calculateSkillScore(job, student) {
@@ -9,7 +10,7 @@ function calculateSkillScore(job, student) {
   const studentSkills = Array.from(student.user_skills.keys());
 
   let score = 0;
-  const maxScore = requiredSkills.length * 1.5; // max if all skills are "adv"
+  const maxScore = requiredSkills.length * 1.5; // max if all skills are "advance"
 
   requiredSkills.forEach(skill => {
     if (studentSkills.includes(skill)) {

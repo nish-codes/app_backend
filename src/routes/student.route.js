@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
-import { signup, checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile, uploadProfilePhoto, getStudentDetails, verifySkill, addSkill } from "../controllers/student.controller.js";
+import { signup, checkUser, login, getJobs, getHackathons, applyToJob, updateStudentProfile, uploadProfilePhoto, getStudentDetails, verifySkill, addSkill, resetSkill } from "../controllers/student.controller.js";
 import {   signup,
     checkUser,
     login,
@@ -44,6 +45,7 @@ router.post(
 //skills route
 router.post('/verifySkills', verifyFirebaseToken, verifySkill)
 router.post('/addSkills', verifyFirebaseToken, addSkill)
+router.post('/resetSkill', verifyFirebaseToken, resetSkill)
 // ✅ Data fetching routes  
 router.get('/StudentDetails', verifyFirebaseToken, getStudentDetails)
 // Data fetching routes  

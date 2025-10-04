@@ -78,10 +78,18 @@ const postJob = async (req, res) => {
     const { 
       title, 
       description, 
+      rolesAndResponsibilities,
+      perks,
+      details,
       salaryRange, 
       recruiter,   // directly from body
       preferences, 
       jobType, 
+      employmentType,
+      noOfOpenings,
+      duration,
+      mode,
+      stipend,
       college, 
       applicationLink 
     } = req.body;
@@ -100,12 +108,34 @@ const postJob = async (req, res) => {
       });
     }
 
+    // Validate employmentType
+    if (!employmentType || !["full-time", "part-time", "contract", "internship", "freelance"].includes(employmentType)) {
+      return res.status(400).json({ 
+        message: "Valid employmentType is required (full-time, part-time, contract, internship, freelance)" 
+      });
+    }
+
+    // Validate mode
+    if (!mode || !["remote", "on-site", "hybrid"].includes(mode)) {
+      return res.status(400).json({ 
+        message: "Valid mode is required (remote, on-site, hybrid)" 
+      });
+    }
+
     let jobData = { 
       title, 
       description, 
+      rolesAndResponsibilities,
+      perks,
+      details,
       salaryRange, 
       preferences: preferences || {}, 
-      jobType 
+      jobType,
+      employmentType,
+      noOfOpenings: noOfOpenings || 1,
+      duration,
+      mode,
+      stipend
     };
 
     if (jobType === "on-campus") {
@@ -273,7 +303,10 @@ const companyJobs = await Job.find({
     ),
   },
 })
-.populate("recruiter", "name email designation company")
+.populate({
+  path: "recruiter",
+  select: "name email designation company"
+})
 .sort({ createdAt: -1 });
 
       console.log("💼 Skills-based jobs found:", companyJobs.length);
@@ -310,7 +343,14 @@ const companyJobs = await Job.find({
       console.log("📋 Fetching general company jobs...");
       
       const generalJobs = await Job.find({ jobType: "company" })
-        .populate("recruiter", "name email designation company")
+        .populate({
+          path: "recruiter",
+          select: "name email designation company",
+          populate: {
+            path: "company",
+            select: "name description industry website location size companyType founded logo"
+          }
+        })
         .sort({ createdAt: -1 })
         .limit(10);
 
@@ -328,20 +368,47 @@ const companyJobs = await Job.find({
       }
     }
 
-    // 4️⃣ Determine search strategy
+    // 4️⃣ Priority 3: On-campus jobs (if student has college info)
+    if (student.education?.college) {
+      console.log("🏫 Searching for on-campus jobs...");
+      
+      const onCampusJobs = await Job.find({ 
+        jobType: "on-campus",
+        college: student.education.college
+      })
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+      console.log("🏫 On-campus jobs found:", onCampusJobs.length);
+
+      if (onCampusJobs.length > 0) {
+        const onCampusJobsWithPriority = onCampusJobs.map(job => ({
+          ...job.toObject(),
+          priority: "on-campus"
+        }));
+
+        opportunities = [...opportunities, ...onCampusJobsWithPriority];
+      }
+    }
+
+    // 5️⃣ Determine search strategy
     const skillsCount = opportunities.filter(j => j.priority === "skills-based").length;
     const generalCount = opportunities.filter(j => j.priority === "general").length;
+    const onCampusCount = opportunities.filter(j => j.priority === "on-campus").length;
 
     if (skillsCount > 0) {
       searchStrategy = "skills-based";
+    } else if (onCampusCount > 0) {
+      searchStrategy = "on-campus";
     } else {
       searchStrategy = "general";
     }
 
-    // 5️⃣ Response message
+    // 6️⃣ Response message
     const getMessageDetails = () => {
       const parts = [];
       if (skillsCount > 0) parts.push(`${skillsCount} skills-matched`);
+      if (onCampusCount > 0) parts.push(`${onCampusCount} on-campus`);
       if (generalCount > 0) parts.push(`${generalCount} general`);
       
       return `Found ${opportunities.length} opportunities: ${parts.join(", ")}`;
@@ -357,6 +424,7 @@ const companyJobs = await Job.find({
       hasUserSkills,
       breakdown: {
         skillsBased: skillsCount,
+        onCampus: onCampusCount,
         general: generalCount
       }
     };
