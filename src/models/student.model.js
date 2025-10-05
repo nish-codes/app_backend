@@ -23,6 +23,7 @@ const studentSchema = new mongoose.Schema({
     FullName: { type: String, required: true },
     profilePicture: { type: String, default: "" },
     bio: { type: String, maxlength: 500, default: "" },
+    about: { type: String, maxlength: 1000, default: "" },
   },
   education: {
     college: { type: String, index: true, default: "" },
@@ -41,8 +42,8 @@ const studentSchema = new mongoose.Schema({
     of: new mongoose.Schema({
       level: {
         type: String,
-        enum: ["beginner", "mid", "adv"],
-        required: true
+        enum: ["unverified", "beginner", "mid", "advance"],
+        default: "unverified"
       }
     }, { _id: false }),
     default: new Map()

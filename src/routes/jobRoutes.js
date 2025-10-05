@@ -23,7 +23,11 @@ router.post("/", async (req, res) => {
 // Get all jobs
 router.get("/", async (req, res) => {
   try {
-    const jobs = await Job.find();
+    const jobs = await Job.find()
+      .populate({
+        path: "recruiter",
+        select: "name email designation company"
+      });
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ error: err.message });

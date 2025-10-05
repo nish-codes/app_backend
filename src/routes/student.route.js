@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
-
+import { upload } from "../middlewares/multer.middleware.js";
 
 
 import {   signup,
@@ -46,6 +46,7 @@ router.post(
 //skills route
 router.post('/verifySkills', verifyFirebaseToken, verifySkill)
 router.post('/addSkills', verifyFirebaseToken, addSkill)
+router.post('/resetSkill', verifyFirebaseToken, resetSkill)
 // ✅ Data fetching routes  
 router.get('/StudentDetails', verifyFirebaseToken, getStudentDetails)
 // Data fetching routes  

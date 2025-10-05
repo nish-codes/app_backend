@@ -89,6 +89,7 @@ const checkUser = async (req, res) => {
                 : ""))),
         profilePicture: profile?.profilePicture || picture || "",
         bio: profile?.bio || "",
+        about: profile?.about || "",
       },
 
       education: {
@@ -213,8 +214,7 @@ const fetchsaves = async(req, res) => {
             .populate({
                 path: 'saves',
                 populate: [
-                    { path: 'company', select: 'name logo' },
-                    { path: 'recruiter', select: 'name email' }
+                    { path: 'recruiter', select: 'name email company' }
                 ]
             });
             
@@ -263,14 +263,14 @@ const fetchAppliedJobs = async (req, res) => {
       return res.status(404).json({ success: false, message: "Student not found" });
     }
     
-    // ✅ Populate job AND nested company/recruiter
+    // ✅ Populate job AND recruiter with embedded company details
     const applications = await Application.find({ candidate: student._id })
       .populate({
         path: "job",
-        populate: [
-          { path: "company", select: "name logo" },
-          { path: "recruiter", select: "name email" }
-        ]
+        populate: {
+          path: "recruiter",
+          select: "name email designation company"
+        }
       })
       .exec();
     
@@ -328,7 +328,7 @@ const getJobs = async (req, res) => {
         .limit(limitNum)
         .populate({
           path: "recruiter",
-          select: "name email designation company",
+          select: "name email designation company"
         })
         .lean(),
       Job.countDocuments(filter),
@@ -527,6 +527,7 @@ const updateStudentProfile = async (req, res) => {
       "profile.lastName",
       "profile.profilePicture",
       "profile.bio",
+      "profile.about",
       "profile.dateOfBirth",
       "profile.gender",
       "profile.location.city",
@@ -639,8 +640,8 @@ const addSkill = async (req, res) => {
       return res.status(400).json({ message: "Skill already exists" });
     }
 
-    // Add new skill with null level
-    user.user_skills.set(skillName, { level: null });
+    // Add new skill with unverified level (default)
+    user.user_skills.set(skillName, { level: "unverified" });
 
     await user.save();
 
@@ -661,7 +662,7 @@ const verifySkill = async (req, res) => {
   const { skillName, level } = req.body;
   if (!skillName || !level) return res.status(400).json({ message: "Skill name and level are required" });
 
-  const allowedLevels = ["beginner", "mid", "adv"];
+  const allowedLevels = ["unverified", "beginner", "mid", "advance"];
   if (!allowedLevels.includes(level)) {
     return res.status(400).json({ message: "Invalid skill level" });
   }
@@ -675,15 +676,56 @@ const verifySkill = async (req, res) => {
       return res.status(400).json({ message: "Skill does not exist. Add it first." });
     }
 
+    const currentSkill = user.user_skills.get(skillName);
+    
+    // Check if skill is already verified through quiz (not unverified)
+    if (currentSkill.level !== "unverified") {
+      return res.status(400).json({ 
+        message: "Skill is already verified. Take a quiz to improve your level or reset the skill to unverified first." 
+      });
+    }
+
+    // Only allow manual verification if skill is unverified
     user.user_skills.set(skillName, { level });
     await user.save();
 
     return res.status(200).json({
-      message: "Skill level updated successfully",
+      message: "Skill level updated successfully through manual verification",
       skills: user.user_skills,
     });
   } catch (error) {
     console.error("Error updating skill level:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Reset skill to unverified (allows retaking quiz)
+const resetSkill = async (req, res) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  const { skillName } = req.body;
+  if (!skillName) return res.status(400).json({ message: "Skill name is required" });
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Ensure the skill exists
+    if (!user.user_skills.has(skillName)) {
+      return res.status(400).json({ message: "Skill does not exist. Add it first." });
+    }
+
+    // Reset skill to unverified
+    user.user_skills.set(skillName, { level: "unverified" });
+    await user.save();
+
+    return res.status(200).json({
+      message: "Skill reset to unverified successfully. You can now retake the quiz.",
+      skills: user.user_skills,
+    });
+  } catch (error) {
+    console.error("Error resetting skill:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -807,7 +849,7 @@ const getApplications = async (req, res) => {
           select: "title preferences location createdAt recruiter",
           populate: {
             path: "recruiter",
-            select: "name email designation company",
+            select: "name email designation company"
           },
         })
         .lean(),
@@ -910,7 +952,7 @@ const getStudentAnalytics = async (req, res) => {
           select: "title preferences location createdAt recruiter",
           populate: {
             path: "recruiter",
-            select: "name email designation company",
+            select: "name email designation company"
           },
         })
       .lean();
@@ -942,6 +984,9 @@ export {
   getStudentDetails,
   addSkill,
   verifySkill,
+
+  resetSkill,
+
   fetchsaves,
   fetchAppliedJobs,
   getApplicationCounts,

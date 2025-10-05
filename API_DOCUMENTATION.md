@@ -4,13 +4,14 @@
 - [Authentication](#authentication)
 - [Student Routes](#student-routes)
 - [Recruiter Routes](#recruiter-routes)
-- [Company Routes](#company-routes)
 - [College Routes](#college-routes)
 - [Admin Routes](#admin-routes)
 - [Skills & Questions Routes](#skills--questions-routes)
 - [Job Routes](#job-routes)
+- [Data Models](#data-models)
 - [Common Response Formats](#common-response-formats)
 - [Error Handling](#error-handling)
+- [Middleware & Utilities](#middleware--utilities)
 
 ---
 
@@ -44,6 +45,8 @@ Content-Type: application/json
     "FullName": "John Doe",
     "firstName": "John",
     "lastName": "Doe",
+    "bio": "Passionate software developer with 2 years of experience...",
+    "about": "I am a dedicated computer science student with a strong interest in web development...",
     "dateOfBirth": "2000-01-01",
     "phone": "1234567890",
     "address": "123 Main St"
@@ -56,9 +59,9 @@ Content-Type: application/json
     "cgpa": 8.5
   },
   "user_skills": {
-    "JavaScript": "intermediate",
+    "JavaScript": "mid",
     "React": "beginner",
-    "Node.js": "advanced"
+    "Node.js": "advance"
   }
 }
 ```
@@ -115,10 +118,10 @@ Authorization: Bearer <firebase_token>
 }
 ```
 
-### 5. Verify Skills
-**POST** `/student/verifySkills`
+### 5. Add Skills
+**POST** `/student/addSkills`
 
-**Description:** Verify student skills through assessment
+**Description:** Add a skill to student profile (starts as unverified)
 
 **Headers:**
 ```
@@ -129,30 +132,24 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "skills": ["JavaScript", "React", "Node.js"],
-  "answers": {
-    "JavaScript": ["answer1", "answer2", ...],
-    "React": ["answer1", "answer2", ...]
-  }
+  "skillName": "JavaScript"
 }
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "verifiedSkills": ["JavaScript", "React"],
-  "scores": {
-    "JavaScript": 85,
-    "React": 92
+  "message": "Skill added successfully",
+  "skills": {
+    "JavaScript": { "level": "unverified" }
   }
 }
 ```
 
-### 6. Add Skills
-**POST** `/student/addSkills`
+### 6. Verify Skills (Manual)
+**POST** `/student/verifySkills`
 
-**Description:** Add verified skills to student profile
+**Description:** Manually verify student skills (only works for unverified skills)
 
 **Headers:**
 ```
@@ -163,14 +160,58 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
+  "skillName": "JavaScript",
+  "level": "beginner"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Skill level updated successfully through manual verification",
   "skills": {
-    "JavaScript": "intermediate",
-    "React": "beginner"
+    "JavaScript": { "level": "beginner" }
   }
 }
 ```
 
-### 7. Get Student Details
+**Note:** Manual verification only works if the skill is currently "unverified". For quiz-based verification, use `/skills/submitQuiz`.
+
+### 7. Reset Skill
+**POST** `/student/resetSkill`
+
+**Description:** Reset a skill back to unverified (allows retaking quiz)
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "skillName": "JavaScript"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Skill reset to unverified successfully. You can now retake the quiz.",
+  "skills": {
+    "JavaScript": { "level": "unverified" }
+  }
+}
+```
+
+**Skill Levels:**
+- `unverified` (default when adding skills)
+- `beginner` (0.5 weight in job matching)
+- `mid` (1.0 weight in job matching)
+- `advance` (1.5 weight in job matching)
+
+### 8. Get Student Details
 **POST** `/student/StudentDetails`
 
 **Description:** Get detailed student information
@@ -256,15 +297,19 @@ Authorization: Bearer <firebase_token>
 ```
 
 ### 10. Apply to Job
-**POST** `/student/jobs/:jobId/apply`
+**POST** `/student/jobs/:jobId/:jobtype/apply`
 
-**Description:** Apply to a specific job
+**Description:** Apply to a specific job (supports different job types)
 
 **Headers:**
 ```
 Authorization: Bearer <firebase_token>
 Content-Type: application/json
 ```
+
+**URL Parameters:**
+- `jobId`: The ID of the job to apply to
+- `jobtype`: Type of job (`company`, `on-campus`, `external`)
 
 **Request Body:**
 ```json
@@ -314,7 +359,94 @@ Content-Type: application/json
 }
 ```
 
-### 12. Get Applications
+### 12. Upload Profile Photo
+**POST** `/student/upload-profile-photo`
+
+**Description:** Upload and update student profile photo
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+Content-Type: multipart/form-data
+```
+
+**Request Body:**
+```
+profilePhoto: <file> (PNG, JPG, JPEG only, max 5MB)
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Profile photo uploaded successfully",
+  "data": {
+    "profilePicture": "https://res.cloudinary.com/...",
+    "public_id": "profile_photos/xyz123"
+  }
+}
+```
+
+### 13. Get Saved Jobs
+**GET** `/student/saves`
+
+**Description:** Get list of jobs saved by the student
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "saves": [
+    {
+      "_id": "job_id",
+      "title": "Software Engineer",
+      "description": "Job description...",
+      "salaryRange": { "min": 50000, "max": 80000 },
+      "recruiter": {
+        "name": "John Doe",
+        "email": "john@company.com",
+        "company": {
+          "name": "Tech Corp",
+          "industry": "Technology"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 14. Get Applied Jobs
+**GET** `/student/fetchappliedjobs`
+
+**Description:** Get list of jobs the student has applied to
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "appliedJobs": [
+    {
+      "_id": "job_id",
+      "title": "Software Engineer",
+      "description": "Job description...",
+      "status": "applied",
+      "appliedAt": "2024-01-16T08:00:00Z"
+    }
+  ]
+}
+```
+
+### 15. Get Applications
 **GET** `/student/applications`
 
 **Description:** Get a student's applications with optional filtering and pagination
@@ -1001,21 +1133,30 @@ Authorization: Bearer <firebase_token>
 
 **Description:** Get assessment questions for skills verification
 
+**Query Parameters:**
+- `lvl`: Difficulty level (`Beginner`, `Intermediate`, `Advanced`)
+- `skill`: Skill name (e.g., `JavaScript`, `React`, `Python`)
+
+**Example:** `GET /skills/questions?lvl=Beginner&skill=JavaScript`
+
 **Response:**
 ```json
-{
-  "success": true,
-  "questions": {
-    "JavaScript": [
-      {
-        "question": "What is the difference between let and var?",
-        "options": ["A", "B", "C", "D"],
-        "correctAnswer": "A"
-      }
-    ],
-    "React": [ ... ]
+[
+  {
+    "Question": "What is the difference between let and var?",
+    "1": "let has block scope, var has function scope",
+    "2": "var has block scope, let has function scope", 
+    "3": "Both have the same scope",
+    "4": "let is deprecated"
+  },
+  {
+    "Question": "Which method is used to add elements to an array?",
+    "1": "push()",
+    "2": "add()",
+    "3": "insert()",
+    "4": "append()"
   }
-}
+]
 ```
 
 ### 2. Get Skills
@@ -1025,17 +1166,18 @@ Authorization: Bearer <firebase_token>
 
 **Response:**
 ```json
-{
-  "success": true,
-  "skills": [
-    "JavaScript",
-    "React",
-    "Node.js",
-    "Python",
-    "Java",
-    "C++"
-  ]
-}
+[
+  "JavaScript",
+  "React",
+  "Node.js",
+  "Python",
+  "Java",
+  "C++",
+  "HTML",
+  "CSS",
+  "MongoDB",
+  "Express.js"
+]
 ```
 
 ### 3. Get Job Preferences
@@ -1045,16 +1187,66 @@ Authorization: Bearer <firebase_token>
 
 **Response:**
 ```json
+[
+  "Software Development",
+  "Data Science",
+  "Web Development",
+  "Mobile Development",
+  "DevOps",
+  "UI/UX Design",
+  "Product Management",
+  "Quality Assurance"
+]
+```
+
+### 4. Submit Quiz Results
+**POST** `/skills/submitQuiz`
+
+**Description:** Submit quiz results and automatically update skill level
+
+**Headers:**
+```
+Authorization: Bearer <firebase_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "skillName": "JavaScript",
+  "difficulty": "Beginner",
+  "score": 8,
+  "totalQuestions": 10,
+  "answers": [
+    {
+      "questionId": "1",
+      "selectedAnswer": "1"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
 {
   "success": true,
-  "preferences": {
-    "jobTypes": ["Full-time", "Part-time", "Internship", "Contract"],
-    "locations": ["Remote", "On-site", "Hybrid"],
-    "experienceLevels": ["Entry", "Mid", "Senior", "Lead"],
-    "industries": ["Technology", "Finance", "Healthcare", "Education"]
+  "message": "Quiz submitted successfully",
+  "data": {
+    "skillName": "JavaScript",
+    "difficulty": "Beginner",
+    "score": 8,
+    "totalQuestions": 10,
+    "percentageScore": 80,
+    "newLevel": "beginner",
+    "skillUpdated": true
   }
 }
 ```
+
+**Skill Level Assignment Logic:**
+- **Score ≥80%**: Can achieve the quiz difficulty level
+- **Score 60-79%**: Achieves beginner level (or current level if higher)
+- **Score <60%**: Remains unverified
 
 ---
 
@@ -1071,12 +1263,43 @@ Authorization: Bearer <firebase_token>
 {
   "title": "Software Engineer",
   "description": "Job description...",
+  "rolesAndResponsibilities": "Develop and maintain web applications...",
+  "perks": "Health insurance, flexible hours, remote work...",
+  "details": "Additional job details and requirements...",
+  "jobType": "company",
+  "employmentType": "full-time",
+  "noOfOpenings": 3,
+  "duration": "6 months",
+  "mode": "hybrid",
+  "stipend": 5000,
   "recruiter": "recruiter_id",
-  "company": "company_id",
   "salaryRange": { "min": 50000, "max": 80000 },
-  "preferences": { ... }
+  "preferences": {
+    "skills": ["JavaScript", "React", "Node.js"],
+    "minExperience": 1,
+    "education": "Bachelor's Degree",
+    "location": "Remote"
+  }
 }
 ```
+
+**Job Fields:**
+- `title`: Job title (required)
+- `description`: Job description (required)
+- `rolesAndResponsibilities`: Detailed role description
+- `perks`: Benefits and perks offered
+- `details`: Additional job information
+- `jobType`: `company`, `on-campus`, `external` (required)
+- `employmentType`: `full-time`, `part-time`, `contract`, `internship`, `freelance` (required)
+- `noOfOpenings`: Number of positions available (required, min: 1)
+- `duration`: Job duration (for contracts/internships)
+- `mode`: `remote`, `on-site`, `hybrid` (required)
+- `stipend`: Stipend amount (for internships/part-time)
+- `recruiter`: Reference to recruiter (optional)
+- `college`: College name (required for on-campus jobs)
+- `salaryRange`: Min and max salary (required)
+- `preferences`: Skills, experience, education, location requirements
+- `applicationLink`: External application link (required for on-campus jobs)
 
 **Request Body (Multiple Jobs):**
 ```json
@@ -1085,23 +1308,16 @@ Authorization: Bearer <firebase_token>
     "title": "Software Engineer",
     "description": "...",
     "recruiter": "recruiter_id",
-    "company": "company_id",
     "salaryRange": { "min": 50000, "max": 80000 }
   },
   {
     "title": "Data Scientist",
     "description": "...",
     "recruiter": "recruiter_id",
-    "company": "company_id",
     "salaryRange": { "min": 60000, "max": 90000 }
   }
 ]
 ```
-
-### 2. Get All Jobs
-**GET** `/jobs/`
-
-**Description:** Get all jobs
 
 **Response:**
 ```json
@@ -1110,13 +1326,230 @@ Authorization: Bearer <firebase_token>
     "_id": "job_id",
     "title": "Software Engineer",
     "description": "...",
-    "recruiter": "recruiter_id",
-    "company": "company_id",
+    "jobType": "company",
+    "employmentType": "full-time",
+    "mode": "hybrid",
     "salaryRange": { "min": 50000, "max": 80000 },
-    "preferences": { ... },
     "createdAt": "2024-01-15T10:30:00Z"
   }
 ]
+```
+
+### 2. Get All Jobs
+**GET** `/jobs/`
+
+**Description:** Get all jobs with recruiter information
+
+**Response:**
+```json
+[
+  {
+    "_id": "job_id",
+    "title": "Software Engineer",
+    "description": "...",
+    "jobType": "company",
+    "employmentType": "full-time",
+    "mode": "hybrid",
+    "salaryRange": { "min": 50000, "max": 80000 },
+    "recruiter": {
+      "name": "John Doe",
+      "email": "john@company.com",
+      "designation": "HR Manager",
+      "company": {
+        "name": "Tech Corp",
+        "industry": "Technology"
+      }
+    },
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+## 📋 Data Models
+
+### Student Model
+```json
+{
+  "_id": "ObjectId",
+  "firebaseId": "string (unique)",
+  "email": "string (unique)",
+  "phone": "string",
+  "profile": {
+    "FullName": "string",
+    "profilePicture": "string (Cloudinary URL)",
+    "bio": "string (max 500 chars)",
+    "about": "string (max 1000 chars)"
+  },
+  "education": {
+    "college": "string",
+    "universityType": "deemed | public | private",
+    "degree": "string",
+    "collegeEmail": "string",
+    "yearOfPassing": "number"
+  },
+  "user_skills": {
+    "skillName": {
+      "level": "unverified | beginner | mid | advance"
+    }
+  },
+  "job_preference": ["string"],
+  "experience": [
+    {
+      "nameOfOrg": "string",
+      "position": "string",
+      "timeline": "string",
+      "description": "string"
+    }
+  ],
+  "projects": [
+    {
+      "projectName": "string",
+      "link": "string",
+      "description": "string"
+    }
+  ],
+  "saves": ["ObjectId (Job references)"],
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
+```
+
+### Recruiter Model
+```json
+{
+  "_id": "ObjectId",
+  "firebaseId": "string (unique)",
+  "name": "string",
+  "email": "string (unique)",
+  "phone": "string",
+  "profilePicture": "string",
+  "designation": "string",
+  "company": {
+    "name": "string",
+    "description": "string",
+    "industry": "string",
+    "website": "string",
+    "location": {
+      "address": "string",
+      "city": "string",
+      "state": "string",
+      "country": "string",
+      "zipcode": "string"
+    },
+    "size": "1-10 | 11-50 | 51-200 | 201-500 | 501-1000 | 1000+",
+    "companyType": "Startup | MNC | SME | Government | Non-Profit",
+    "founded": "number",
+    "logo": "string"
+  },
+  "isVerfied": "boolean",
+  "verificationStatus": "pending | verified | rejected",
+  "activityEngagement": {
+    "jobsPosted": "number",
+    "activeJobs": ["ObjectId (Job references)"]
+  },
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
+```
+
+### Job Model
+```json
+{
+  "_id": "ObjectId",
+  "title": "string",
+  "description": "string",
+  "rolesAndResponsibilities": "string",
+  "perks": "string",
+  "details": "string",
+  "jobType": "company | on-campus | external",
+  "employmentType": "full-time | part-time | contract | internship | freelance",
+  "noOfOpenings": "number (min: 1)",
+  "duration": "string",
+  "mode": "remote | on-site | hybrid",
+  "stipend": "number",
+  "recruiter": "ObjectId (Recruiter reference)",
+  "college": "string (required for on-campus)",
+  "salaryRange": {
+    "min": "number",
+    "max": "number"
+  },
+  "preferences": {
+    "skills": ["string"],
+    "minExperience": "number",
+    "education": "string",
+    "location": "string"
+  },
+  "applicationLink": "string (required for on-campus)",
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
+```
+
+### Application Model
+```json
+{
+  "_id": "ObjectId",
+  "job": "ObjectId (Job reference)",
+  "candidate": "ObjectId (Student reference)",
+  "status": "applied | shortlisted | rejected | hired",
+  "matchScore": "number (0-100)",
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
+```
+
+### College Model
+```json
+{
+  "_id": "ObjectId",
+  "firebaseId": "string (unique)",
+  "name": "string (unique)",
+  "email": "string (unique)",
+  "accessEmail": "string (unique)",
+  "accessPassword": "string",
+  "profile": {
+    "logo": "string",
+    "description": "string (max 1000 chars)",
+    "website": "string",
+    "phone": "string",
+    "address": {
+      "street": "string",
+      "city": "string",
+      "state": "string",
+      "pincode": "string",
+      "country": "string (default: India)"
+    }
+  },
+  "isVerified": "boolean",
+  "verificationStatus": "pending | verified | rejected",
+  "activityEngagement": {
+    "opportunitiesPosted": "number",
+    "activeOpportunities": ["ObjectId (Job references)"]
+  },
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
+```
+
+### Hackathon Model
+```json
+{
+  "_id": "ObjectId",
+  "title": "string",
+  "organizer": "string",
+  "description": "string",
+  "location": "Online | Offline | Hybrid",
+  "startDate": "Date",
+  "endDate": "Date",
+  "registrationDeadline": "Date",
+  "prizePool": "string",
+  "eligibility": "string (default: Open to all)",
+  "website": "string",
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
 ```
 
 ---
@@ -1214,13 +1647,46 @@ const response = await fetch('/api/student/profile', {
 ## 📝 Notes
 
 1. **All timestamps** are in ISO 8601 format
-2. **File uploads** use multipart/form-data
-3. **Pagination** is 0-indexed for pages
-4. **Search** is case-insensitive
-5. **Skills verification** requires passing assessment
-6. **Company registration** must happen before recruiter signup
-7. **Job applications** are automatically linked to students and jobs
-8. **Profile updates** only modify provided fields
+2. **File uploads** use multipart/form-data with Multer middleware
+3. **Profile photos** are uploaded to Cloudinary with automatic optimization
+4. **File size limits**: Profile photos max 5MB, supports PNG/JPG/JPEG only
+5. **Pagination** is 0-indexed for pages
+6. **Search** is case-insensitive
+7. **Skills verification** requires passing assessment
+8. **Company registration** must happen before recruiter signup
+9. **Job applications** are automatically linked to students and jobs
+10. **Profile updates** only modify provided fields
+11. **Job types** support company, on-campus, and external opportunities
+12. **Skills levels** affect job matching algorithm with different weights
+
+---
+
+## 🔧 Middleware & Utilities
+
+### Firebase Authentication Middleware
+All protected routes use `verifyFirebaseToken` middleware that:
+- Extracts Firebase token from `Authorization: Bearer <token>` header
+- Verifies token with Firebase Admin SDK
+- Adds decoded user info to `req.user` object
+- Returns 401 for invalid/missing tokens
+
+### File Upload Middleware (Multer)
+- **Profile Photos**: Max 5MB, PNG/JPG/JPEG only
+- **Storage**: Temporary local storage in `./public/temp`
+- **Filename**: Auto-generated with timestamp and random suffix
+- **File Filter**: Validates MIME types before processing
+
+### Cloudinary Integration
+- **Profile Photos**: Automatically uploaded to Cloudinary
+- **Optimization**: Auto-resize to 400x400 with face detection
+- **Cleanup**: Temporary files deleted after upload
+- **Error Handling**: Graceful fallback for upload failures
+
+### Database Connection
+- **MongoDB**: Connected via Mongoose ODM
+- **Models**: Student, Recruiter, College, Job, Application, Hackathon
+- **Indexes**: Optimized for Firebase UID and email lookups
+- **Validation**: Schema-level validation with custom error messages
 
 ---
 

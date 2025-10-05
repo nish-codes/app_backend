@@ -3,13 +3,63 @@ import mongoose from "mongoose";
 const jobSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    description: { type: String, required: true },
+    description: { 
+      type: String, 
+      required: true 
+    },
+    
+    // New structured description fields
+    rolesAndResponsibilities: {
+      type: String,
+      required: false
+    },
+    perks: {
+      type: String,
+      required: false
+    },
+    details: {
+      type: String,
+      required: false
+    },
     
     jobType: {
       type: String,
       enum: ["company", "on-campus", "external"],
       default: "company",
-      required: true, // Make jobType required first
+      required: true,
+    },
+    
+    // New employment type field (different from jobType)
+    employmentType: {
+      type: String,
+      enum: ["full-time", "part-time", "contract", "internship", "freelance"],
+      required: true,
+      default: "full-time"
+    },
+    
+    // New fields
+    noOfOpenings: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1
+    },
+    
+    duration: {
+      type: String,
+      required: false, // Optional field for contract/internship jobs
+    },
+    
+    mode: {
+      type: String,
+      enum: ["remote", "on-site", "hybrid"],
+      required: true,
+      default: "on-site"
+    },
+    
+    stipend: {
+      type: Number,
+      required: false, // Optional for internships or part-time roles
     },
     
     recruiter: {
