@@ -2,9 +2,9 @@
 import { Student } from "../models/student.model.js";
 import { studentRequiredSchema } from "../zodschemas/student.js";
 import { Application } from "../models/application.model.js"
-import Job  from "../models/job.model.js";
+import Job from "../models/job.model.js";
 import { Hackathon } from "../models/hackathon.model.js";
-import {calculateSkillScore} from './applications.controller.js'
+import { calculateSkillScore } from './applications.controller.js'
 
 
 /**
@@ -14,7 +14,7 @@ const checkUser = async (req, res) => {
   try {
     const uid = req.user?.uid;
     console.log("🔍 Checking user with UID:", uid);
-    
+
     if (!uid) {
       console.log("❌ Missing user UID");
       return res.status(400).json({ message: "Missing user UID" });
@@ -42,7 +42,7 @@ const checkUser = async (req, res) => {
  * - Extra info comes from frontend form
  */
 
- const signup = async (req, res) => {
+const signup = async (req, res) => {
   const { uid, email, name, picture } = req.user; // decoded from Firebase token
 
   try {
@@ -103,11 +103,11 @@ const checkUser = async (req, res) => {
       // ✅ FIXED user_skills
       user_skills: user_skills
         ? Object.entries(user_skills).reduce((acc, [skill, skillData]) => {
-            const levelValue =
-              typeof skillData === "string" ? skillData : skillData.level;
-            acc[skill] = { level: levelValue };
-            return acc;
-          }, {})
+          const levelValue =
+            typeof skillData === "string" ? skillData : skillData.level;
+          acc[skill] = { level: levelValue };
+          return acc;
+        }, {})
         : {},
 
       job_preference:
@@ -117,19 +117,19 @@ const checkUser = async (req, res) => {
 
       experience: Array.isArray(experience)
         ? experience.map((exp) => ({
-            nameOfOrg: exp.nameOfOrg || exp.NameOfOrganization || "",
-            position: exp.position || "",
-            timeline: exp.timeline || "",
-            description: exp.description || "",
-          }))
+          nameOfOrg: exp.nameOfOrg || exp.NameOfOrganization || "",
+          position: exp.position || "",
+          timeline: exp.timeline || "",
+          description: exp.description || "",
+        }))
         : [],
 
       projects: Array.isArray(projects)
         ? projects.map((proj) => ({
-            projectName: proj.projectName || "",
-            link: proj.link || "",
-            description: proj.description || "",
-          }))
+          projectName: proj.projectName || "",
+          link: proj.link || "",
+          description: proj.description || "",
+        }))
         : [],
     };
 
@@ -188,67 +188,67 @@ const login = async (req, res) => {
  * StudentDetails — sends student details for showing it in the profile or in edit features
  */
 const getStudentDetails = async (req, res) => {
-    const uid = req.user?.uid;
+  const uid = req.user?.uid;
 
-    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
 
-    try {
-        const user = await Student.findOne({ firebaseId: uid });
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
 
-        if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-        return res.status(200).json({ message: "User fetched successfully", user });
-    } catch (error) {
-        console.error("Error fetching student details:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
+    return res.status(200).json({ message: "User fetched successfully", user });
+  } catch (error) {
+    console.error("Error fetching student details:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 
-const fetchsaves = async(req, res) => {
-    const uid = req.user?.uid;
-    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
-    
-    try {
-        const user = await Student.findOne({ firebaseId: uid })
-            .populate({
-                path: 'saves',
-                populate: [
-                    { path: 'recruiter', select: 'name email company' }
-                ]
-            });
-            
-        if (!user) return res.status(404).json({ message: "User not found" });
-        
-        return res.status(200).json({ 
-            message: "Saved jobs fetched successfully", 
-            saves: user.saves 
-        });
-    } catch (error) {
-        console.error("Error fetching saved jobs:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
+const fetchsaves = async (req, res) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid })
+      .populate({
+        path: 'saves',
+        populate: [
+          { path: 'recruiter', select: 'name email company' }
+        ]
+      });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    return res.status(200).json({
+      message: "Saved jobs fetched successfully",
+      saves: user.saves
+    });
+  } catch (error) {
+    console.error("Error fetching saved jobs:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 
 
-const removeFromSaves = async(req, res) => {
-    const uid = req.user?.uid;
-    const { jobId } = req.params;
-    
-    if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
-    
-    try {
-        const user = await Student.findOne({ firebaseId: uid });
-        if (!user) return res.status(404).json({ message: "User not found" });
-        
-        user.saves = user.saves.filter(id => id.toString() !== jobId);
-        await user.save();
-        
-        return res.status(200).json({ message: "Job removed from saves" });
-    } catch (error) {
-        console.error("Error removing saved job:", error);
-        return res.status(500).json({ message: "Internal server error" });
-    }
+const removeFromSaves = async (req, res) => {
+  const uid = req.user?.uid;
+  const { jobId } = req.params;
+
+  if (!uid) return res.status(400).json({ message: "Missing Firebase UID" });
+
+  try {
+    const user = await Student.findOne({ firebaseId: uid });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.saves = user.saves.filter(id => id.toString() !== jobId);
+    await user.save();
+
+    return res.status(200).json({ message: "Job removed from saves" });
+  } catch (error) {
+    console.error("Error removing saved job:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }
 
 const fetchAppliedJobs = async (req, res) => {
@@ -257,12 +257,12 @@ const fetchAppliedJobs = async (req, res) => {
     if (!uid) {
       return res.status(400).json({ success: false, message: "Missing Firebase UID" });
     }
-    
+
     const student = await Student.findOne({ firebaseId: uid });
     if (!student) {
       return res.status(404).json({ success: false, message: "Student not found" });
     }
-    
+
     // ✅ Populate job AND recruiter with embedded company details
     const applications = await Application.find({ candidate: student._id })
       .populate({
@@ -273,7 +273,7 @@ const fetchAppliedJobs = async (req, res) => {
         }
       })
       .exec();
-    
+
     return res.status(200).json({
       success: true,
       message: `Found ${applications.length} applied jobs`,
@@ -357,59 +357,59 @@ const applyToJob = async (req, res) => {
     const { jobId, jobtype } = req.params;
     const studentId = req.user?._id || null;
     let student = null;
-    
+
     if (studentId) {
       student = await Student.findById(studentId);
     } else if (req.user?.uid) {
       student = await Student.findOne({ firebaseId: req.user.uid });
     }
-    
+
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-    
+
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
-    
+
     // Handle based on jobtype
     if (jobtype === "on-campus") {
       // Check if already applied (saved in student.saves)
       if (student.saves.some(savedJobId => savedJobId.toString() === jobId)) {
-        return res.status(400).json({ 
-          message: "You have already applied for this on-campus job" 
+        return res.status(400).json({
+          message: "You have already applied for this on-campus job"
         });
       }
-      
+
       // Add to student's saves array
       student.saves.push(jobId);
       await student.save();
-      
+
       return res.status(201).json({
         success: true,
         message: "Application submitted successfully for on-campus job",
         jobId: jobId,
       });
-      
+
     } else if (jobtype === "company") {
       // Check existing application in Application collection
       const existingApp = await Application.findOne({
         $or: [
-          { job: jobId, candidate: student._id }, 
+          { job: jobId, candidate: student._id },
           { job: jobId, student: student._id }
         ],
       });
-      
+
       if (existingApp) {
-        return res.status(400).json({ 
-          message: "You have already applied for this company job" 
+        return res.status(400).json({
+          message: "You have already applied for this company job"
         });
       }
-      
+
       // Calculate skill-based match score
       const matchScore = calculateSkillScore(job, student);
-      
+
       // Create application with matchScore
       const newApplication = await Application.create({
         job: jobId,
@@ -417,30 +417,30 @@ const applyToJob = async (req, res) => {
         matchScore,
         status: "applied",
       });
-      
+
       return res.status(201).json({
         success: true,
         message: "Application submitted successfully for company job",
         application: newApplication,
       });
-      
+
     } else {
       return res.status(400).json({
         success: false,
         message: "Invalid job type. Must be 'company' or 'on-campus'",
       });
     }
-    
+
   } catch (error) {
     console.error("Error applying to job:", error);
-    
+
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
         message: "You've already applied to this job",
       });
     }
-    
+
     return res.status(500).json({
       success: false,
       message: "Server error while applying to job",
@@ -677,11 +677,11 @@ const verifySkill = async (req, res) => {
     }
 
     const currentSkill = user.user_skills.get(skillName);
-    
+
     // Check if skill is already verified through quiz (not unverified)
     if (currentSkill.level !== "unverified") {
-      return res.status(400).json({ 
-        message: "Skill is already verified. Take a quiz to improve your level or reset the skill to unverified first." 
+      return res.status(400).json({
+        message: "Skill is already verified. Take a quiz to improve your level or reset the skill to unverified first."
       });
     }
 
@@ -947,14 +947,14 @@ const getStudentAnalytics = async (req, res) => {
     const recentApplications = await Application.find({ candidate: studentId })
       .sort("-createdAt")
       .limit(10)
-        .populate({
-          path: "job",
-          select: "title preferences location createdAt recruiter",
-          populate: {
-            path: "recruiter",
-            select: "name email designation company"
-          },
-        })
+      .populate({
+        path: "job",
+        select: "title preferences location createdAt recruiter",
+        populate: {
+          path: "recruiter",
+          select: "name email designation company"
+        },
+      })
       .lean();
 
     return res.status(200).json({
@@ -986,12 +986,16 @@ export {
   verifySkill,
 
   resetSkill,
-
   fetchsaves,
   fetchAppliedJobs,
   getApplicationCounts,
   getAppliedApplicationsCount,
   getShortlistedApplicationsCount,
   getApplications,
+<<<<<<< HEAD
    getStudentAnalytics  // <-- This is the duplicate
 };
+=======
+  getStudentAnalytics
+};
+>>>>>>> 0c82f681c9973a45437903d2e27f285cec6a16f9

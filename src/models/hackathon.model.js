@@ -14,6 +14,8 @@ const hackathonSchema = new mongoose.Schema({
     registrationDeadline: { type: Date, required: true },
     prizePool: { type: String },
     eligibility: { type: String, default: "Open to all" },
+    organizedBy: { type: String },
+    mode:{type:String},
     website: { type: String },
 },{timestamps: true})
 
