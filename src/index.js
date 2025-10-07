@@ -19,7 +19,7 @@ app.use("/student", studentRoutes);
 app.use("/jobs", jobRoutes);   // ✅ now jobs are available
 app.use("/recruiter", recruiterRoutes);
 app.use("/college", collegeRoutes);
-
+app.use("/dummy", (req, res) => res.send("API is working"));
 app.use("/skills",questionRoute)
 
 app.listen(3000, () => console.log("Server running on port 3000"));

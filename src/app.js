@@ -9,7 +9,11 @@ app.use(express.urlencoded({
     extended: true
 }))
 app.use(express.static("public"))
-
+app.use(cors({
+  origin: ["http://localhost:5173"], // your frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 import studentRoute from "./routes/student.route.js"
 import questions from "./routes/getQuestions.route.js"
 import recruiterRoute from "./routes/recruiter.route.js"
