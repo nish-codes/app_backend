@@ -9,16 +9,24 @@ app.use(express.urlencoded({
     extended: true
 }))
 app.use(express.static("public"))
-
+app.use(cors({
+  origin: ["http://localhost:5173"], // your frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 import studentRoute from "./routes/student.route.js"
 import questions from "./routes/getQuestions.route.js"
 import recruiterRoute from "./routes/recruiter.route.js"
 import collegeRoute from "./routes/college.route.js"
 import adminRoute from "./routes/admin.route.js"
+import companyRoute from "./routes/company.route.js"
+import jobRoutes from "./routes/jobRoutes.js"
 
 app.use("/student", studentRoute)
 app.use("/recruiter", recruiterRoute)
 app.use("/college", collegeRoute)
 app.use("/admin", adminRoute)
 app.use("/skills", questions)
+app.use("/company", companyRoute)
+app.use("/job", jobRoutes)
 export default app 

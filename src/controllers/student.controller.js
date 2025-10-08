@@ -517,7 +517,7 @@ const applyToJob = async (req, res) => {
  */
 const updateStudentProfile = async (req, res) => {
   try {
-    const studentId = req.user?._id;
+    const studentId = req.user?.uid;
     if (!studentId) return res.status(400).json({ message: "Missing student id" });
 
     const allowedUpdates = [
@@ -992,10 +992,8 @@ export {
   getAppliedApplicationsCount,
   getShortlistedApplicationsCount,
   getApplications,
-<<<<<<< HEAD
+
    getStudentAnalytics  // <-- This is the duplicate
 };
-=======
-  getStudentAnalytics
-};
->>>>>>> 0c82f681c9973a45437903d2e27f285cec6a16f9
+
+

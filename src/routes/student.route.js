@@ -1,13 +1,10 @@
 import { Router } from "express";
 import { verifyFirebaseToken } from "../middlewares/verifyFirebaseToken.js";
 
-<<<<<<< HEAD
 
-import {   signup,
-=======
 import {
     signup,
->>>>>>> 0c82f681c9973a45437903d2e27f285cec6a16f9
+
     checkUser,
     login,
     getJobs,

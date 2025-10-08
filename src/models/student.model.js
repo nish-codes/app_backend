@@ -81,6 +81,12 @@ const studentSchema = new mongoose.Schema({
       ref: "Job"
     }
   ]
+  applied: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Application"
+    }
+  ]
 
 }, { timestamps: true });
 
