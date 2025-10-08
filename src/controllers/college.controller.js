@@ -474,19 +474,21 @@ const getCollegeOpportunities = async (req, res) => {
   try {
     // 1️⃣ Find current student
     let student;
-
     if (req.user._id) {
-      student = await Student.findById(req.user._id).select("education.college user_skills");
+      student = await Student.findById(req.user._id)
+        .select("education.college user_skills saves applied")
+        .populate('applied', 'job'); // Populate to get job IDs from applications
     }
-
     if (!student && req.user.uid) {
-      student = await Student.findOne({ firebaseId: req.user.uid }).select("education.college user_skills");
+      student = await Student.findOne({ firebaseId: req.user.uid })
+        .select("education.college user_skills saves applied")
+        .populate('applied', 'job');
     }
-
     if (!student && req.user._id) {
-      student = await Student.findOne({ firebaseId: req.user._id }).select("education.college user_skills");
+      student = await Student.findOne({ firebaseId: req.user._id })
+        .select("education.college user_skills saves applied")
+        .populate('applied', 'job');
     }
-
     if (!student) {
       return res.status(404).json({
         success: false,
@@ -498,14 +500,35 @@ const getCollegeOpportunities = async (req, res) => {
       });
     }
 
-    // 2️⃣ Only fetch on-campus jobs
+    // 2️⃣ Extract job IDs to exclude (saved + applied)
+    const savedJobIds = student.saves || [];
+    
+    // Extract job IDs from applied applications
+    const appliedJobIds = student.applied
+      ? student.applied.map(app => app.job).filter(Boolean)
+      : [];
+    
+    // Combine both arrays and convert to strings for comparison
+    const excludeJobIds = [
+      ...savedJobIds.map(id => id.toString()),
+      ...appliedJobIds.map(id => id.toString())
+    ];
+
+    console.log("🚫 Excluding jobs:", {
+      savedCount: savedJobIds.length,
+      appliedCount: appliedJobIds.length,
+      totalExcluded: excludeJobIds.length
+    });
+
+    // 3️⃣ Only fetch on-campus jobs (excluding saved and applied)
     if (student.education && student.education.college) {
       const collegeName = student.education.college;
       console.log("🏫 Searching for on-campus jobs at:", collegeName);
-
+      
       const onCampusJobs = await Job.find({
         jobType: "on-campus",
-        college: { $regex: new RegExp(collegeName, "i") }
+        college: { $regex: new RegExp(collegeName, "i") },
+        _id: { $nin: excludeJobIds } // Exclude saved and applied jobs
       }).sort({ createdAt: -1 });
 
       console.log("🏫 On-campus jobs found:", onCampusJobs.length);
@@ -515,6 +538,7 @@ const getCollegeOpportunities = async (req, res) => {
         message: `Found ${onCampusJobs.length} on-campus opportunities for ${collegeName}`,
         opportunities: onCampusJobs,
         totalCount: onCampusJobs.length,
+        excludedCount: excludeJobIds.length,
         searchStrategy: "on-campus",
         userSkills: student.user_skills ? Object.keys(student.user_skills) : [],
         hasUserSkills: !!(student.user_skills && Object.keys(student.user_skills).length > 0)
@@ -531,7 +555,6 @@ const getCollegeOpportunities = async (req, res) => {
       userSkills: [],
       hasUserSkills: false
     });
-
   } catch (error) {
     console.error("❌ Error fetching on-campus opportunities:", error);
     return res.status(500).json({

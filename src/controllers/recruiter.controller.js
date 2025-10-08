@@ -244,7 +244,6 @@ const getUserSkillsArray = (userSkills) => {
   return [];
 };
 
-
 const getApplications = async (req, res) => {
   try {
     console.log("🔍 Auth Debug - req.user:", req.user);
@@ -253,15 +252,18 @@ const getApplications = async (req, res) => {
     let student;
     
     if (req.user._id) {
-      student = await Student.findById(req.user._id).select("education.college user_skills");
+      student = await Student.findById(req.user._id)
+        .select("education.college user_skills saves applied");
     }
     
     if (!student && req.user.uid) {
-      student = await Student.findOne({ firebaseId: req.user.uid }).select("education.college user_skills");
+      student = await Student.findOne({ firebaseId: req.user.uid })
+        .select("education.college user_skills saves applied");
     }
     
     if (!student && req.user._id) {
-      student = await Student.findOne({ firebaseId: req.user._id }).select("education.college user_skills");
+      student = await Student.findOne({ firebaseId: req.user._id })
+        .select("education.college user_skills saves applied");
     }
     
     if (!student) {
@@ -279,6 +281,23 @@ const getApplications = async (req, res) => {
     console.log("🎓 Student college:", student.education?.college || "None");
     console.log("🛠️ Raw user_skills:", student.user_skills);
 
+    // 2️⃣ Extract job IDs to exclude (saved + applied)
+    const savedJobIds = student.saves || [];
+    const appliedJobIds = student.applied || [];
+    
+    // Combine both arrays and convert to strings for comparison
+    const excludeJobIds = [
+      ...savedJobIds.map(id => id.toString()),
+      ...appliedJobIds.map(id => id.toString())
+    ];
+
+    console.log("🚫 Excluding jobs:", {
+      savedCount: savedJobIds.length,
+      appliedCount: appliedJobIds.length,
+      totalExcluded: excludeJobIds.length,
+      excludedIds: excludeJobIds
+    });
+
     const userSkillsArray = getUserSkillsArray(student.user_skills);
     const hasUserSkills = userSkillsArray.length > 0;
 
@@ -288,26 +307,27 @@ const getApplications = async (req, res) => {
     let opportunities = [];
     let searchStrategy = "";
     
-    // 2️⃣ Priority 1: Skills-based company jobs
+    // 3️⃣ Priority 1: Skills-based company jobs (excluding applied/saved)
     if (hasUserSkills) {
       console.log("🎯 Searching for skills-based jobs...");
       
-// Escape regex special characters
-const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Escape regex special characters
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const companyJobs = await Job.find({
-  jobType: "company",
-  "preferences.skills": {
-    $in: userSkillsArray.map((skill) => 
-      new RegExp(`^${escapeRegex(skill)}$`, "i")
-    ),
-  },
-})
-.populate({
-  path: "recruiter",
-  select: "name email designation company"
-})
-.sort({ createdAt: -1 });
+      const companyJobs = await Job.find({
+        jobType: "company",
+        _id: { $nin: excludeJobIds }, // Exclude applied and saved jobs
+        "preferences.skills": {
+          $in: userSkillsArray.map((skill) => 
+            new RegExp(`^${escapeRegex(skill)}$`, "i")
+          ),
+        },
+      })
+      .populate({
+        path: "recruiter",
+        select: "name email designation company"
+      })
+      .sort({ createdAt: -1 });
 
       console.log("💼 Skills-based jobs found:", companyJobs.length);
 
@@ -338,11 +358,14 @@ const companyJobs = await Job.find({
       }
     }
     
-    // 3️⃣ Priority 2: General company jobs (fallback)
+    // 4️⃣ Priority 2: General company jobs (fallback - excluding applied/saved)
     if (opportunities.length === 0 || !hasUserSkills) {
       console.log("📋 Fetching general company jobs...");
       
-      const generalJobs = await Job.find({ jobType: "company" })
+      const generalJobs = await Job.find({ 
+        jobType: "company",
+        _id: { $nin: excludeJobIds } // Exclude applied and saved jobs
+      })
         .populate({
           path: "recruiter",
           select: "name email designation company",
@@ -368,13 +391,14 @@ const companyJobs = await Job.find({
       }
     }
 
-    // 4️⃣ Priority 3: On-campus jobs (if student has college info)
+    // 5️⃣ Priority 3: On-campus jobs (if student has college info - excluding applied/saved)
     if (student.education?.college) {
       console.log("🏫 Searching for on-campus jobs...");
       
       const onCampusJobs = await Job.find({ 
         jobType: "on-campus",
-        college: student.education.college
+        college: student.education.college,
+        _id: { $nin: excludeJobIds } // Exclude applied and saved jobs
       })
       .sort({ createdAt: -1 })
       .limit(5);
@@ -391,7 +415,7 @@ const companyJobs = await Job.find({
       }
     }
 
-    // 5️⃣ Determine search strategy
+    // 6️⃣ Determine search strategy
     const skillsCount = opportunities.filter(j => j.priority === "skills-based").length;
     const generalCount = opportunities.filter(j => j.priority === "general").length;
     const onCampusCount = opportunities.filter(j => j.priority === "on-campus").length;
@@ -404,7 +428,7 @@ const companyJobs = await Job.find({
       searchStrategy = "general";
     }
 
-    // 6️⃣ Response message
+    // 7️⃣ Response message
     const getMessageDetails = () => {
       const parts = [];
       if (skillsCount > 0) parts.push(`${skillsCount} skills-matched`);
@@ -419,6 +443,7 @@ const companyJobs = await Job.find({
       message: getMessageDetails(),
       opportunities,
       totalCount: opportunities.length,
+      excludedCount: excludeJobIds.length,
       searchStrategy,
       userSkills: userSkillsArray,
       hasUserSkills,
@@ -451,7 +476,6 @@ const companyJobs = await Job.find({
     });
   }
 };
-
 
 
 

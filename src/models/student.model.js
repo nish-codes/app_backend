@@ -80,7 +80,7 @@ const studentSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: "Job"
     }
-  ]
+  ],
   applied: [
     {
       type: mongoose.Schema.Types.ObjectId,

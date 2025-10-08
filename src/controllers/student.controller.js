@@ -357,90 +357,101 @@ const applyToJob = async (req, res) => {
     const { jobId, jobtype } = req.params;
     const studentId = req.user?._id || null;
     let student = null;
-
+    
     if (studentId) {
       student = await Student.findById(studentId);
     } else if (req.user?.uid) {
       student = await Student.findOne({ firebaseId: req.user.uid });
     }
-
+    
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-
+    
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
-
+    
     // Handle based on jobtype
     if (jobtype === "on-campus") {
       // Check if already applied (saved in student.saves)
       if (student.saves.some(savedJobId => savedJobId.toString() === jobId)) {
-        return res.status(400).json({
-          message: "You have already applied for this on-campus job"
+        return res.status(400).json({ 
+          message: "You have already applied for this on-campus job" 
         });
       }
-
+      
       // Add to student's saves array
       student.saves.push(jobId);
       await student.save();
 
+      
       return res.status(201).json({
         success: true,
         message: "Application submitted successfully for on-campus job",
         jobId: jobId,
       });
-
+      
     } else if (jobtype === "company") {
-      // Check existing application in Application collection
-      const existingApp = await Application.findOne({
-        $or: [
-          { job: jobId, candidate: student._id },
-          { job: jobId, student: student._id }
-        ],
-      });
-
-      if (existingApp) {
-        return res.status(400).json({
-          message: "You have already applied for this company job"
-        });
-      }
-
-      // Calculate skill-based match score
-      const matchScore = calculateSkillScore(job, student);
-
-      // Create application with matchScore
-      const newApplication = await Application.create({
-        job: jobId,
-        candidate: student._id,
-        matchScore,
-        status: "applied",
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: "Application submitted successfully for company job",
-        application: newApplication,
-      });
-
-    } else {
+  // Check if already applied in student.applied array
+  if (student.applied.some(appliedJobId => appliedJobId.toString() === jobId)) {
+    return res.status(400).json({ 
+      message: "You have already applied for this company job" 
+    });
+  }
+  
+  // Check existing application in Application collection
+  const existingApp = await Application.findOne({
+    $or: [
+      { job: jobId, candidate: student._id }, 
+      { job: jobId, student: student._id }
+    ],
+  });
+  
+  if (existingApp) {
+    return res.status(400).json({ 
+      message: "You have already applied for this company job" 
+    });
+  }
+  
+  // Calculate skill-based match score
+  const matchScore = calculateSkillScore(job, student);
+  
+  // Create application with matchScore
+  const newApplication = await Application.create({
+    job: jobId,
+    candidate: student._id,
+    matchScore,
+    status: "applied",
+  });
+  
+  // Only add to applied array AFTER successful application creation
+  student.applied.push(jobId);
+  await student.save();
+  
+  return res.status(201).json({
+    success: true,
+    message: "Application submitted successfully for company job",
+    application: newApplication,
+  });
+} else {
       return res.status(400).json({
         success: false,
         message: "Invalid job type. Must be 'company' or 'on-campus'",
       });
     }
-
+    
   } catch (error) {
     console.error("Error applying to job:", error);
-
+    
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
         message: "You've already applied to this job",
       });
     }
-
+    
     return res.status(500).json({
       success: false,
       message: "Server error while applying to job",
@@ -517,32 +528,27 @@ const applyToJob = async (req, res) => {
  */
 const updateStudentProfile = async (req, res) => {
   try {
-    const studentId = req.user?.uid;
-    if (!studentId) return res.status(400).json({ message: "Missing student id" });
-
+    const firebaseUid = req.user?.uid;
+    if (!firebaseUid) return res.status(400).json({ message: "Missing student id" });
+    
     const allowedUpdates = [
       "email",
       "phone",
-      "profile.firstName",
-      "profile.lastName",
+      "profile.FullName",
       "profile.profilePicture",
       "profile.bio",
       "profile.about",
-      "profile.dateOfBirth",
-      "profile.gender",
-      "profile.location.city",
-      "profile.location.state",
-      "profile.location.country",
-      "profile.location.pincode",
       "education.college",
+      "education.universityType",
       "education.degree",
-      "education.branch",
-      "education.year",
-      "education.cgpa",
-      "education.graduationYear",
+      "education.collegeEmail",
+      "education.yearOfPassing",
       "user_skills",
+      "job_preference",
+      "experience",
+      "projects",
     ];
-
+    
     const updates = {};
     for (const key of allowedUpdates) {
       const parts = key.split(".");
@@ -555,16 +561,31 @@ const updateStudentProfile = async (req, res) => {
         }
       }
     }
-
-    const updatedStudent = await Student.findByIdAndUpdate(studentId, { $set: updates }, { new: true, runValidators: true });
+    
+    // Use findOneAndUpdate with firebaseId instead of findByIdAndUpdate
+    const updatedStudent = await Student.findOneAndUpdate(
+      { firebaseId: firebaseUid },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+    
     if (!updatedStudent) return res.status(404).json({ message: "Student not found" });
-
-    return res.status(200).json({ success: true, message: "Profile updated successfully", student: updatedStudent });
+    
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      student: updatedStudent
+    });
   } catch (error) {
     console.error("Error updating student profile:", error);
-    return res.status(500).json({ success: false, message: "Server error while updating profile", error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating profile",
+      error: error.message
+    });
   }
 };
+
 
 /**
  * Upload profile photo (expects multer to populate req.file)
